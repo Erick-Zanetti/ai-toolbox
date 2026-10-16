@@ -36,6 +36,7 @@ CSS = """
             border: 1px solid alpha(@view_fg_color, 0.06); }
 .atb-action { padding-left: 16px; padding-right: 16px; border-radius: 10px; font-weight: 700; }
 .atb-lang > button { border-radius: 999px; padding-left: 14px; padding-right: 10px; }
+.atb-tile > image { color: @accent_color; -gtk-icon-style: symbolic; }
 @keyframes atb-pulse { from { opacity: 0.35; } to { opacity: 0.95; } }
 .atb-thinking { font-size: 12px; animation: atb-pulse 0.8s ease-in-out infinite alternate; }
 """

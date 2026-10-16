@@ -195,8 +195,7 @@ class Settings:
         row.add_row(_entry(t("Name"), cmd.get("name", ""), lambda v: update("name", v)))
         output = cmd.get("output", "window")
         row.add_row(_combo(
-            t("Result"), [t("Show a window (review, edit, Ctrl+Enter)"),
-                          t("Replace directly (notifications)")],
+            t("Result"), [t("Show a window"), t("Replace directly")],
             OUTPUT_MODES.index(output) if output in OUTPUT_MODES else 0,
             lambda i: update("output", OUTPUT_MODES[i])))
         names = [t("Default"), *self._providers()]

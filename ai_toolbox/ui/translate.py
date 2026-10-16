@@ -25,7 +25,7 @@ def _dropdown(items: list[str]) -> Gtk.DropDown:
     return dd
 
 
-def show(cfg: Config, text: str) -> Outcome:
+def show(cfg: Config, text: str, contextual: bool = False) -> Outcome:
     outcome = Outcome()
     tr = cfg.translate
     languages = list(tr.languages)
@@ -42,7 +42,8 @@ def show(cfg: Config, text: str) -> Outcome:
         langs = Gtk.Box(spacing=6)
         for widget in (source_dd, swap, target_dd):
             langs.append(widget)
-        context_toggle = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text="Ctrl+I")
+        context_toggle = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text="Ctrl+I",
+                                    active=contextual)
         context_box = Gtk.Box(spacing=8)
         context_box.append(Gtk.Label(label=t("With context"), css_classes=["atb-hint"]))
         context_box.append(context_toggle)
@@ -98,8 +99,7 @@ def show(cfg: Config, text: str) -> Outcome:
             parts.append(t("{n} word" if words == 1 else "{n} words", n=words))
             info.set_label("  ·  ".join(parts))
             m = model()
-            mode = t("with context") if context_toggle.get_active() else t("literal")
-            model_label.set_label(f"{mode} · {m.provider} · {m.model}")
+            model_label.set_label(f"{m.provider} · {m.model}")
 
         def render_output() -> None:
             lang, body_text, note_text = prompts.split_translation(state["raw"])

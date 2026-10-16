@@ -7,6 +7,10 @@
 <p align="center">Raycast-style AI text commands and translator for Wayland desktops.<br>
 Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</p>
 
+<p align="center">
+  <img src="docs/screenshots/result.png" width="720" alt="Result window: original with removed words in red, result with added words in green">
+</p>
+
 - **Commands.** Fix spelling, improve writing, change tone: each one is a small
   TOML file with a prompt. `output = "replace"` swaps the selection in place,
   no window; `output = "window"` shows the result first, streaming, with the
@@ -21,6 +25,17 @@ Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</
   through any OpenAI-compatible endpoint (Ollama, LM Studio, llama.cpp).
 - **Fits your desktop.** GTK 4 + libadwaita: follows your light/dark mode,
   accent and theme colors. UI in your system language (English, Portuguese).
+
+## Screenshots
+
+| Command palette | Translator, with context |
+|---|---|
+| ![Command palette](docs/screenshots/palette.png) | ![Translator](docs/screenshots/translate.png) |
+| **Settings** | **Light theme** |
+| ![Settings](docs/screenshots/settings.png) | ![Result window in light mode](docs/screenshots/result-light.png) |
+
+The windows use libadwaita colors, so they follow light/dark mode, the accent
+color and custom GTK color schemes (e.g. matugen/wallust themes).
 
 ## Requirements
 
@@ -86,7 +101,8 @@ niri: a `window-rule` matching `app-id="dev.aitoolbox.AiToolbox"` with `open-flo
 ai-toolbox                    command palette
 ai-toolbox run <command>      run on the selection (output from the command file)
 ai-toolbox window <command>   same, always showing the result window
-ai-toolbox translate          translator, prefilled with the selection (--empty to skip)
+ai-toolbox translate          translator, prefilled with the selection
+                              (--empty: start empty, --context: with context on)
 ai-toolbox list               list commands
 ai-toolbox settings           settings window
 ```
@@ -141,6 +157,7 @@ uv run --no-project --with pytest python -m pytest
 ```
 
 Adding a UI language: add a table to [`ai_toolbox/i18n.py`](ai_toolbox/i18n.py).
+Screenshots: `scripts/screenshots.sh` (Hyprland) regenerates `docs/screenshots`.
 
 ## License
 

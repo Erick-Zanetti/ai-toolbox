@@ -99,10 +99,10 @@ def _run(cmd: config.Command, cfg: config.Config, inv: Invocation, force_window:
     return 0
 
 
-def _translate(cfg: config.Config, inv: Invocation) -> int:
+def _translate(cfg: config.Config, inv: Invocation, contextual: bool = False) -> int:
     from .ui import translate as window
 
-    outcome = window.show(cfg, inv.text)
+    outcome = window.show(cfg, inv.text, contextual)
     _deliver(outcome.action, outcome.text, inv, cfg)
     return 0
 
@@ -116,14 +116,14 @@ def run_command(name: str, force_window: bool) -> int:
     return _run(cmd, cfg, _capture(cfg), force_window)
 
 
-def translate(use_selection: bool) -> int:
+def translate(use_selection: bool, contextual: bool = False) -> int:
     cfg = config.load()
     if use_selection:
         inv = _capture(cfg)
     else:
         desk = desktop.detect()
         inv = Invocation("", desk.focused(), desk)
-    return _translate(cfg, inv)
+    return _translate(cfg, inv, contextual)
 
 
 def palette() -> int:
@@ -164,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("command")
     p = sub.add_parser("translate")
     p.add_argument("--empty", action="store_true", help="ignore the current selection")
+    p.add_argument("--context", action="store_true", help="start with translation with context on")
     sub.add_parser("list")
     sub.add_parser("palette")
     sub.add_parser("settings")
@@ -173,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.action in ("run", "window"):
             return run_command(args.command, force_window=args.action == "window")
         if args.action == "translate":
-            return translate(use_selection=not args.empty)
+            return translate(use_selection=not args.empty, contextual=args.context)
         if args.action == "list":
             return list_commands()
         if args.action == "settings":
