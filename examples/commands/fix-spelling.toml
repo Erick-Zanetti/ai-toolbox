@@ -1,6 +1,7 @@
 name = "Fix spelling"
-# replace: rewrite the selection in place (no window). window: show the result first.
-output = "replace"
+# window: show the result first, Ctrl+Enter replaces the selection.
+# replace: rewrite the selection in place, no window (like Raycast's Quick Fix).
+output = "window"
 # provider / model are optional; they fall back to config.toml.
 model = "haiku"
 prompt = """

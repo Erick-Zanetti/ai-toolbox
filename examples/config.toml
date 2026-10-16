@@ -8,6 +8,14 @@
 
 default_provider = "claude"
 
+# Nothing highlighted? Send Ctrl+C to the app and use what it copies.
+# Off by default: some apps copy the whole line when nothing is selected.
+# Never sent to the terminals below.
+copy_fallback = false
+
+# Window classes that paste with Ctrl+Shift+V.
+terminal_classes = ["foot", "org.codeberg.dnkl.foot", "kitty", "Alacritty", "com.mitchellh.ghostty", "org.wezfurlong.wezterm"]
+
 [providers.claude]
 model = "haiku"
 
@@ -30,6 +38,3 @@ languages = ["Spanish", "French", "German", "Italian", "Japanese", "Chinese (Sim
 # Literal: fast and faithful. Contextual (Ctrl+I): reads context.md.
 literal = { provider = "claude", model = "haiku" }
 contextual = { provider = "claude", model = "sonnet" }
-
-# Window classes that paste with Ctrl+Shift+V.
-terminal_classes = ["foot", "org.codeberg.dnkl.foot", "kitty", "Alacritty", "com.mitchellh.ghostty", "org.wezfurlong.wezterm"]

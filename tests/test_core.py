@@ -40,7 +40,8 @@ def test_literal_prompt_has_no_context_and_contextual_has_it():
 
 def test_examples_load():
     cfg = config.load(EXAMPLES)
-    assert cfg.commands["fix-spelling"].output == "replace"
+    assert cfg.commands["fix-spelling"].output == "window"
+    assert "foot" in cfg.terminal_classes and cfg.copy_fallback is False
     assert cfg.commands["fix-spelling"].model == config.Model("claude", "haiku", None)
     assert cfg.translate.pair == ("English", "Portuguese (Brazil)")
     assert cfg.translate.languages[:2] == cfg.translate.pair
@@ -192,3 +193,26 @@ def test_copy_fallback_gives_up_when_nothing_was_copied(monkeypatch):
             return True
 
     assert Fake().copy_selection(desktop.Target("1", "app"), ()) == ""
+
+
+def test_copy_fallback_is_off_by_default_and_never_hits_terminals(monkeypatch):
+    from ai_toolbox import cli, desktop
+
+    calls = []
+
+    class Fake(desktop.Desktop):
+        def focused(self):
+            return desktop.Target("1", "foot")
+
+        def copy_selection(self, target, terminal_classes):
+            calls.append(target.app_id)
+            return "copied"
+
+    monkeypatch.setattr(desktop, "detect", lambda: Fake())
+    monkeypatch.setattr(desktop, "selection", lambda: "")
+    cfg = config.load(EXAMPLES)
+    assert cli._capture(cfg).text == "" and calls == []
+
+    import dataclasses
+    on = dataclasses.replace(cfg, copy_fallback=True)
+    assert cli._capture(on).text == "" and calls == []  # foot is a terminal

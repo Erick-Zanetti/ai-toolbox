@@ -42,8 +42,8 @@ Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</
 Without a way to send keys the result stays on the clipboard and a
 notification tells you to press Ctrl+V.
 
-Text comes from the primary selection (just highlight it). Apps that don't
-offer one get a Ctrl+C sent to them instead.
+Text comes from the primary selection: just highlight it. For apps without
+one, `copy_fallback = true` sends them a Ctrl+C instead (never to terminals).
 
 ## Install
 

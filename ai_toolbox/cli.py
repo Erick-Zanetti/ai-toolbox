@@ -32,7 +32,10 @@ def _capture(cfg: config.Config) -> Invocation:
     desk = desktop.detect()
     target = desk.focused()
     text = desktop.selection()
-    if not text.strip() and target is not None:
+    # Opt-in: Ctrl+C with nothing selected clears a terminal prompt or copies
+    # a whole line in some editors, so it is never sent to terminals.
+    if (cfg.copy_fallback and not text.strip() and target is not None
+            and target.app_id not in cfg.terminal_classes):
         text = desk.copy_selection(target, cfg.terminal_classes)
     return Invocation(text=text, target=target, desk=desk)
 

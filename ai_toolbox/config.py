@@ -64,6 +64,7 @@ class Config:
     translate: Translate
     context: str
     terminal_classes: tuple[str, ...]
+    copy_fallback: bool = False
     commands: dict[str, Command] = field(default_factory=dict)
 
 
@@ -163,5 +164,6 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
         translate=translate,
         context=context,
         terminal_classes=tuple(raw.get("terminal_classes", ())),
+        copy_fallback=bool(raw.get("copy_fallback", False)),
         commands=commands,
     )
