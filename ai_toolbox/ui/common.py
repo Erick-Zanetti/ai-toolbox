@@ -88,6 +88,9 @@ def clear_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> None:
 
 def shortcut(widget: Gtk.Widget, accel: str, callback) -> None:
     controller = Gtk.ShortcutController(scope=Gtk.ShortcutScope.GLOBAL)
+    # Capture phase: run before focused text views, which would otherwise
+    # eat keys like Ctrl+Enter (newline).
+    controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
     controller.add_shortcut(Gtk.Shortcut(
         trigger=Gtk.ShortcutTrigger.parse_string(accel),
         action=Gtk.CallbackAction.new(lambda *_: (callback(), True)[1]),
