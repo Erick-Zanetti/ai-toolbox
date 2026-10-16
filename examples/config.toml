@@ -1,0 +1,35 @@
+# ai-toolbox config (~/.config/ai-toolbox/config.toml).
+#
+# Providers (the table name is yours; `type` defaults to the table name):
+#   claude → Claude Code CLI, using your logged-in Claude subscription
+#   codex  → Codex CLI, using your logged-in ChatGPT subscription
+#   openai → any OpenAI-compatible endpoint: Ollama, LM Studio, llama.cpp...
+# `model` here is each provider's default; commands can override it.
+
+default_provider = "claude"
+
+[providers.claude]
+model = "haiku"
+
+[providers.codex]
+model = "gpt-5.6-luna"
+reasoning = "low"
+
+# Local models, e.g. Ollama (`ollama pull llama3.2`):
+# [providers.ollama]
+# type = "openai"
+# base_url = "http://localhost:11434/v1"
+# model = "llama3.2"
+# api_key_env = "MY_API_KEY"   # only for endpoints that need a key
+
+[translate]
+# "Auto" target: text in one of these goes to the other.
+pair = ["English", "Portuguese (Brazil)"]
+languages = ["Spanish", "French", "German", "Italian", "Japanese", "Chinese (Simplified)"]
+
+# Literal: fast and faithful. Contextual (Ctrl+I): reads context.md.
+literal = { provider = "claude", model = "haiku" }
+contextual = { provider = "claude", model = "sonnet" }
+
+# Window classes that paste with Ctrl+Shift+V.
+terminal_classes = ["foot", "org.codeberg.dnkl.foot", "kitty", "Alacritty", "com.mitchellh.ghostty", "org.wezfurlong.wezterm"]

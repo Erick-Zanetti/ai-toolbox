@@ -1,0 +1,14 @@
+name = "Fix spelling"
+# replace: rewrite the selection in place (no window). window: show the result first.
+output = "replace"
+# provider / model are optional; they fall back to config.toml.
+model = "haiku"
+prompt = """
+Fix spelling, grammar and punctuation in the text. Change as little as possible:
+keep the wording, tone, language and formatting. If it is already correct,
+return it unchanged.
+
+<text>
+{selection}
+</text>
+"""

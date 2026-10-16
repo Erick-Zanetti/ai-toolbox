@@ -1,0 +1,194 @@
+from pathlib import Path
+
+import pytest
+
+from ai_toolbox import config, prompts, providers
+
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+
+
+def test_split_translation_reads_language_body_and_note():
+    raw = "@lang English\nOlá, tudo bem?\nLinha dois\n@note Usei 'tudo bem' por ser informal."
+    assert prompts.split_translation(raw) == (
+        "English", "Olá, tudo bem?\nLinha dois", "Usei 'tudo bem' por ser informal.")
+
+
+def test_split_translation_without_markers_is_just_the_body():
+    assert prompts.split_translation("Hello") == (None, "Hello", None)
+
+
+def test_split_translation_while_header_streams():
+    assert prompts.split_translation("@lang Eng") == ("Eng", "", None)
+
+
+def test_render_fills_placeholders():
+    out = prompts.render("Fix:\n{selection}\nAbout: {context}", "teh text", "dev")
+    assert out == "Fix:\nteh text\nAbout: dev"
+
+
+def test_render_appends_text_when_template_has_no_placeholder():
+    out = prompts.render("Summarize.", "long text", "")
+    assert out.endswith("<text>\nlong text\n</text>")
+
+
+def test_literal_prompt_has_no_context_and_contextual_has_it():
+    literal = prompts.translate_system(None, None, ("English", "Portuguese"), None)
+    contextual = prompts.translate_system(None, "English", ("English", "Portuguese"), "I work at X")
+    assert "I work at X" not in literal and "literally" in literal
+    assert "I work at X" in contextual and "Translate into English." in contextual
+
+
+def test_examples_load():
+    cfg = config.load(EXAMPLES)
+    assert cfg.commands["fix-spelling"].output == "replace"
+    assert cfg.commands["fix-spelling"].model == config.Model("claude", "haiku", None)
+    assert cfg.translate.pair == ("English", "Portuguese (Brazil)")
+    assert cfg.translate.languages[:2] == cfg.translate.pair
+
+
+def test_command_with_other_provider_uses_that_providers_defaults(tmp_path):
+    (tmp_path / "commands").mkdir()
+    (tmp_path / "config.toml").write_text(
+        '[providers.claude]\nmodel = "haiku"\n[providers.codex]\nmodel = "luna"\nreasoning = "low"\n')
+    (tmp_path / "commands" / "x.toml").write_text('provider = "codex"\nprompt = "p"\n')
+    assert config.load(tmp_path).commands["x"].model == config.Model("codex", "luna", "low")
+
+
+def test_bad_output_is_rejected(tmp_path):
+    (tmp_path / "commands").mkdir()
+    (tmp_path / "config.toml").write_text('[providers.claude]\nmodel = "haiku"\n')
+    (tmp_path / "commands" / "x.toml").write_text('output = "popup"\nprompt = "p"\n')
+    with pytest.raises(config.ConfigError):
+        config.load(tmp_path)
+
+
+def test_claude_stream_parser_yields_text_deltas():
+    lines = [
+        '{"type":"system"}',
+        '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi "}}}',
+        '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"there"}}}',
+        '{"type":"result","is_error":false}',
+    ]
+    assert "".join(providers._claude_chunks(iter(lines))) == "Hi there"
+
+
+def test_claude_stream_parser_raises_on_error_result():
+    with pytest.raises(providers.ProviderError):
+        list(providers._claude_chunks(iter(['{"type":"result","is_error":true,"result":"limit"}'])))
+
+
+def test_ui_strings_follow_system_language(monkeypatch):
+    import importlib
+
+    from ai_toolbox import i18n
+
+    monkeypatch.setenv("LANG", "pt_BR.UTF-8")
+    for var in ("LANGUAGE", "LC_ALL", "LC_MESSAGES"):
+        monkeypatch.delenv(var, raising=False)
+    assert importlib.reload(i18n).t("{n} words", n=2) == "2 palavras"
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    assert importlib.reload(i18n).t("{n} words", n=2) == "2 words"
+
+
+def test_sse_parser_yields_content_until_done():
+    lines = [
+        b": keep-alive\n",
+        b'data: {"choices":[{"delta":{"role":"assistant"}}]}\n',
+        b'data: {"choices":[{"delta":{"content":"Ol"}}]}\n',
+        b'data: {"choices":[{"delta":{"content":"\xc3\xa1"}}]}\n',
+        b"data: [DONE]\n",
+        b'data: {"choices":[{"delta":{"content":"ignored"}}]}\n',
+    ]
+    assert "".join(providers._sse_chunks(iter(lines))) == "Olá"
+
+
+def test_openai_provider_needs_base_url(tmp_path):
+    (tmp_path / "config.toml").write_text('[providers.local]\ntype = "openai"\nmodel = "llama3.2"\n')
+    with pytest.raises(config.ConfigError):
+        config.load(tmp_path)
+
+
+def test_openai_provider_loads(tmp_path):
+    (tmp_path / "config.toml").write_text(
+        '[providers.local]\ntype = "openai"\nmodel = "llama3.2"\n'
+        'base_url = "http://localhost:11434/v1"\n')
+    model = config.load(tmp_path).default
+    assert (model.type, model.base_url) == ("openai", "http://localhost:11434/v1")
+
+
+def test_terminal_windows_paste_with_shift(monkeypatch):
+    from ai_toolbox import desktop
+
+    sent = []
+    monkeypatch.setattr(desktop.time, "sleep", lambda _: None)
+
+    class Fake(desktop.Desktop):
+        def send_shortcut(self, target, key, terminal):
+            sent.append(terminal)
+            return True
+
+    Fake().paste(desktop.Target("1", "foot"), ("foot",))
+    Fake().paste(desktop.Target("2", "firefox"), ("foot",))
+    assert sent == [True, False]
+
+
+def test_http_run_streams_from_openai_compatible_server():
+    import http.server
+    import json
+    import threading
+
+    seen = {}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen["auth"] = self.headers.get("Authorization")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for part in ("Hello", " world"):
+                chunk = {"choices": [{"delta": {"content": part}}]}
+                self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+
+        def log_message(self, *_):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    model = config.Model("local", "tiny", kind="openai",
+                         base_url=f"http://127.0.0.1:{server.server_port}/v1")
+    try:
+        assert providers.complete(model, "sys", "hi") == "Hello world"
+    finally:
+        server.shutdown()
+    assert seen["body"]["messages"][0] == {"role": "system", "content": "sys"}
+    assert seen["body"]["stream"] is True and seen["auth"] is None
+
+
+def test_copy_fallback_reads_new_clipboard(monkeypatch):
+    from ai_toolbox import desktop
+
+    board = {"text": "old"}
+    monkeypatch.setattr(desktop.time, "sleep", lambda _: None)
+    monkeypatch.setattr(desktop, "clipboard", lambda: board["text"])
+
+    class Fake(desktop.Desktop):
+        def send_shortcut(self, target, key, terminal):
+            board["text"] = "selected words"
+            return key == "c"
+
+    assert Fake().copy_selection(desktop.Target("1", "app"), ()) == "selected words"
+
+
+def test_copy_fallback_gives_up_when_nothing_was_copied(monkeypatch):
+    from ai_toolbox import desktop
+
+    monkeypatch.setattr(desktop.time, "sleep", lambda _: None)
+    monkeypatch.setattr(desktop, "clipboard", lambda: "old")
+
+    class Fake(desktop.Desktop):
+        def send_shortcut(self, target, key, terminal):
+            return True
+
+    assert Fake().copy_selection(desktop.Target("1", "app"), ()) == ""

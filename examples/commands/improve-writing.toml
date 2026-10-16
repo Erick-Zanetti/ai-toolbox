@@ -1,0 +1,15 @@
+name = "Improve writing"
+output = "window"
+model = "sonnet"
+prompt = """
+Improve the text so it reads clearly and naturally, as a fluent native speaker
+would write it. Fix errors, smooth awkward phrasing, keep the meaning, tone and
+language. Do not make it longer than needed.
+
+About the writer, for tone and vocabulary:
+{context}
+
+<text>
+{selection}
+</text>
+"""
