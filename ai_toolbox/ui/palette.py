@@ -4,18 +4,32 @@ from __future__ import annotations
 
 from ..config import Config
 from ..i18n import t
-from .common import Adw, Gtk, run_window, shortcut
+from .common import Adw, Gtk, hint_bar, icon_tile, run_window, shortcut
 
 TRANSLATE = "translate"
-PREVIEW_CHARS = 140
+SETTINGS = "settings"
+PREVIEW_CHARS = 180
+KEYS = [("↑↓", "navigate"), ("Enter", "run"), ("Esc", "close")]
 
 
 def _row(item_id: str, title: str, subtitle: str, icon: str) -> Gtk.ListBoxRow:
     row = Adw.ActionRow(title=title, subtitle=subtitle, activatable=True)
-    row.add_prefix(Gtk.Image(icon_name=icon, pixel_size=20))
+    row.add_prefix(icon_tile(icon))
     row.item_id = item_id
     row.search_text = f"{title} {item_id}".lower()
     return row
+
+
+def _selection_chip(selection: str) -> Gtk.Widget:
+    text = " ".join(selection.split())
+    preview = (text[:PREVIEW_CHARS] + "…") if len(text) > PREVIEW_CHARS else text
+    chip = Gtk.Box(spacing=10, css_classes=["atb-chip"])
+    chip.append(Gtk.Image(icon_name="insert-text-symbolic" if preview else "dialog-information-symbolic",
+                          valign=Gtk.Align.START, opacity=0.6))
+    chip.append(Gtk.Label(label=preview or t("No text selected"), xalign=0, hexpand=True,
+                          wrap=True, lines=2, ellipsize=3,
+                          css_classes=[] if preview else ["dim-label"]))
+    return chip
 
 
 def show(cfg: Config, selection: str) -> str | None:
@@ -23,52 +37,45 @@ def show(cfg: Config, selection: str) -> str | None:
 
     def build(app: Adw.Application) -> Adw.ApplicationWindow:
         win = Adw.ApplicationWindow(application=app, title="AI Toolbox",
-                                    default_width=640, default_height=440)
+                                    default_width=620, default_height=460)
         search = Gtk.SearchEntry(placeholder_text=t("Search commands"), hexpand=True)
         search.add_css_class("atb-search")
 
         listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE)
         listbox.add_css_class("navigation-sidebar")
-        listbox.append(_row(TRANSLATE, t("Translate"), t("Translate text"),
-                            "preferences-desktop-locale-symbolic"))
         for cmd in cfg.commands.values():
             kind = t("Replaces the selection") if cmd.output == "replace" else t("Shows the result")
-            listbox.append(_row(cmd.id, cmd.name, f"{kind}  ·  {cmd.model.provider} · {cmd.model.model}",
-                                cmd.icon))
-        listbox.append(_row("settings", t("Settings"), t("Commands, notifications, models"),
+            listbox.append(_row(cmd.id, cmd.name,
+                                f"{kind}  ·  {cmd.model.provider} · {cmd.model.model}", cmd.icon))
+        listbox.append(_row(TRANSLATE, t("Translate"), t("Translate text"),
+                            "preferences-desktop-locale-symbolic"))
+        listbox.append(_row(SETTINGS, t("Settings"), t("Commands, notifications, models"),
                             "preferences-system-symbolic"))
         scroller = Gtk.ScrolledWindow(child=listbox, vexpand=True,
                                       hscrollbar_policy=Gtk.PolicyType.NEVER)
 
-        text = " ".join(selection.split())
-        preview = (text[:PREVIEW_CHARS] + "…") if len(text) > PREVIEW_CHARS else text
-        selected_label = Gtk.Label(
-            label=f"{t('Selected text')}: {preview}" if preview else t("No text selected"),
-            xalign=0, ellipsize=3, css_classes=["atb-hint"])
-        hints = Gtk.Label(label=t("Enter run  ·  Esc close"), xalign=1, css_classes=["atb-hint"])
         footer = Gtk.Box(spacing=12)
-        selected_label.set_hexpand(True)
-        footer.append(selected_label)
-        footer.append(hints)
+        footer.append(Gtk.Label(label="AI Toolbox", xalign=0, hexpand=True,
+                                css_classes=["atb-pane-title"]))
+        footer.append(hint_bar(KEYS))
 
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
                        margin_start=14, margin_end=14, margin_top=14, margin_bottom=12)
-        body.append(search)
-        body.append(scroller)
-        body.append(footer)
+        for widget in (search, _selection_chip(selection), scroller, footer):
+            body.append(widget)
         win.set_content(body)
+
+        def matches(row) -> bool:
+            words = search.get_text().lower().split()
+            return all(w in row.search_text for w in words)
 
         def visible_rows() -> list[Gtk.ListBoxRow]:
             rows, row = [], listbox.get_first_child()
             while row:
-                if _matches(row):
+                if matches(row):
                     rows.append(row)
                 row = row.get_next_sibling()
             return rows
-
-        def _matches(row) -> bool:
-            words = search.get_text().lower().split()
-            return all(w in row.search_text for w in words)
 
         def refilter(*_) -> None:
             listbox.invalidate_filter()
@@ -91,7 +98,7 @@ def show(cfg: Config, selection: str) -> str | None:
             chosen["id"] = row.item_id
             win.close()
 
-        listbox.set_filter_func(_matches)
+        listbox.set_filter_func(matches)
         search.connect("search-changed", refilter)
         search.connect("activate", lambda *_: activate())
         search.connect("stop-search", lambda *_: win.close())

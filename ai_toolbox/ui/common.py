@@ -15,12 +15,31 @@ APP_ID = "dev.aitoolbox.AiToolbox"
 CSS = """
 .atb-text { font-size: 15px; background: transparent; }
 .atb-text text { background: transparent; }
-.atb-pane { background: alpha(@view_fg_color, 0.04); border-radius: 12px; padding: 10px 12px; }
-.atb-search { min-height: 42px; font-size: 16px; }
+.atb-pane { background: alpha(@view_fg_color, 0.045); border-radius: 14px; padding: 12px 14px;
+            border: 1px solid alpha(@view_fg_color, 0.06); }
+.atb-pane-title { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; opacity: 0.55; }
+.atb-search { min-height: 44px; font-size: 17px; border-radius: 12px; }
 .atb-hint { font-size: 12px; opacity: 0.6; }
-.atb-note { font-size: 13px; padding: 8px 12px; border-radius: 10px;
-              background: alpha(@accent_bg_color, 0.12); }
+.atb-note { font-size: 13px; padding: 10px 12px; border-radius: 12px;
+            background: alpha(@accent_bg_color, 0.14); }
+.atb-key { font-family: monospace; font-size: 11px; font-weight: 600; min-width: 14px;
+           padding: 1px 6px; border-radius: 6px; background: alpha(@window_fg_color, 0.08);
+           border: 1px solid alpha(@window_fg_color, 0.14);
+           box-shadow: inset 0 -1px alpha(@window_fg_color, 0.14); }
+.atb-keylabel { font-size: 12px; opacity: 0.65; margin-right: 10px; }
+.atb-stat { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+.atb-stat-add { color: #2ec27e; background: alpha(#2ec27e, 0.15); }
+.atb-stat-del { color: #e66159; background: alpha(#e01b24, 0.15); }
+.atb-tile { border-radius: 10px; padding: 7px; background: alpha(@accent_bg_color, 0.18);
+            color: @accent_color; }
+.atb-chip { border-radius: 12px; padding: 8px 12px; background: alpha(@view_fg_color, 0.05);
+            border: 1px solid alpha(@view_fg_color, 0.06); }
+.atb-action { padding-left: 16px; padding-right: 16px; border-radius: 10px; font-weight: 700; }
+.atb-lang > button { border-radius: 999px; padding-left: 14px; padding-right: 10px; }
+@keyframes atb-pulse { from { opacity: 0.35; } to { opacity: 0.95; } }
+.atb-thinking { font-size: 12px; animation: atb-pulse 0.8s ease-in-out infinite alternate; }
 """
+
 
 def install_css() -> None:
     provider = Gtk.CssProvider()
@@ -74,16 +93,42 @@ def _paint(view: Gtk.TextView, name: str, spans: list[tuple[int, int]]) -> None:
         buf.apply_tag(tag, buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
 
 
-def show_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> None:
-    """Red strike-through on what left `before_view`, green on what is new in `after_view`."""
+def show_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> tuple[int, int]:
+    """Red strike-through on what left `before_view`, green on what is new in
+    `after_view`. Returns (removed, added) change counts."""
     removed, added = word_diff(buffer_text(before_view), buffer_text(after_view))
     _paint(before_view, "removed", removed)
     _paint(after_view, "added", added)
+    return len(removed), len(added)
 
 
 def clear_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> None:
     _paint(before_view, "removed", [])
     _paint(after_view, "added", [])
+
+
+def hint_bar(items: list[tuple[str, str]]) -> Gtk.Box:
+    """Keyboard hints drawn as keycaps: [("Ctrl+Enter", "replace"), ...]."""
+    from ..i18n import t
+
+    bar = Gtk.Box(spacing=4, halign=Gtk.Align.END, valign=Gtk.Align.CENTER)
+    for keys, label in items:
+        for key in keys.split("+"):
+            bar.append(Gtk.Label(label=key, css_classes=["atb-key"]))
+        bar.append(Gtk.Label(label=t(label), css_classes=["atb-keylabel"]))
+    return bar
+
+
+def icon_tile(icon_name: str, size: int = 18) -> Gtk.Widget:
+    image = Gtk.Image(icon_name=icon_name, pixel_size=size)
+    tile = Gtk.Box(valign=Gtk.Align.CENTER, css_classes=["atb-tile"])
+    tile.append(image)
+    return tile
+
+
+def stat_pill(kind: str) -> Gtk.Label:
+    """A small '+3' / '−2' counter; kind is 'add' or 'del'."""
+    return Gtk.Label(visible=False, css_classes=["atb-stat", f"atb-stat-{kind}"])
 
 
 def shortcut(widget: Gtk.Widget, accel: str, callback) -> None:

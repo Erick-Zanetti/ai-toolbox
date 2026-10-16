@@ -7,12 +7,13 @@ from __future__ import annotations
 from .. import providers, prompts
 from ..config import Config
 from ..i18n import t
-from .common import Adw, GLib, Gtk, buffer_text, idle, run_window, shortcut, text_view
+from .common import (Adw, GLib, Gtk, buffer_text, hint_bar, idle, run_window, shortcut,
+                     text_view)
 from .result import Outcome
 
 DEBOUNCE_MS = 700
-HINTS = ("Ctrl+Enter paste into app", "Ctrl+Shift+C copy", "Ctrl+S swap",
-         "Ctrl+I with context", "Ctrl+P target", "Esc clear/close")
+KEYS = [("Ctrl+S", "swap"), ("Ctrl+I", "with context"), ("Ctrl+P", "target"),
+        ("Esc", "clear/close")]
 
 
 def _dropdown(items: list[str]) -> Gtk.DropDown:
@@ -20,6 +21,7 @@ def _dropdown(items: list[str]) -> Gtk.DropDown:
     dd.set_enable_search(True)
     dd.set_search_match_mode(Gtk.StringFilterMatchMode.SUBSTRING)
     dd.set_expression(Gtk.PropertyExpression.new(Gtk.StringObject, None, "string"))
+    dd.add_css_class("atb-lang")
     return dd
 
 
@@ -35,17 +37,24 @@ def show(cfg: Config, text: str) -> Outcome:
                                     default_width=820, default_height=560)
         source_dd, target_dd = _dropdown(sources), _dropdown(targets)
         swap = Gtk.Button(icon_name="object-flip-horizontal-symbolic",
-                          tooltip_text=t("Swap (Ctrl+S)"))
+                          tooltip_text=t("Swap (Ctrl+S)"),
+                          css_classes=["flat", "circular"])
         langs = Gtk.Box(spacing=6)
         for widget in (source_dd, swap, target_dd):
             langs.append(widget)
         context_toggle = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text="Ctrl+I")
         context_box = Gtk.Box(spacing=8)
-        context_box.append(Gtk.Label(label=t("With context")))
+        context_box.append(Gtk.Label(label=t("With context"), css_classes=["atb-hint"]))
         context_box.append(context_toggle)
         spinner = Adw.Spinner(visible=False)
         header = Adw.HeaderBar(title_widget=langs)
-        header.pack_end(context_box)
+        paste_btn = Gtk.Button(label=t("Paste"), tooltip_text="Ctrl+Enter",
+                               css_classes=["suggested-action", "atb-action"])
+        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic",
+                              tooltip_text=f"{t('Copy')} (Ctrl+Shift+C)",
+                              css_classes=["flat", "circular"])
+        header.pack_end(paste_btn)
+        header.pack_end(copy_btn)
         header.pack_end(spinner)
 
         src_scroll, src_view = text_view(editable=True)
@@ -55,12 +64,19 @@ def show(cfg: Config, text: str) -> Outcome:
         info_row = Gtk.Box()
         info_row.append(info)
         info_row.append(model_label)
-        note = Gtk.Label(xalign=0, wrap=True, visible=False, css_classes=["atb-note"])
-        hints = Gtk.Label(label="  ·  ".join(t(h) for h in HINTS), xalign=0, wrap=True, css_classes=["atb-hint"])
+        context_box.set_margin_start(12)
+        info_row.append(context_box)
+        note = Gtk.Label(xalign=0, wrap=True, hexpand=True)
+        note_box = Gtk.Box(spacing=10, visible=False, css_classes=["atb-note"])
+        note_box.append(Gtk.Image(icon_name="dialog-information-symbolic", valign=Gtk.Align.START))
+        note_box.append(note)
+        footer = Gtk.Box()
+        footer.append(Gtk.Label(hexpand=True))
+        footer.append(hint_bar(KEYS))
 
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
                        margin_start=14, margin_end=14, margin_bottom=12, margin_top=4)
-        for widget in (src_scroll, info_row, out_scroll, note, hints):
+        for widget in (src_scroll, info_row, out_scroll, note_box, footer):
             body.append(widget)
         toolbar = Adw.ToolbarView(content=body)
         toolbar.add_top_bar(header)
@@ -93,8 +109,8 @@ def show(cfg: Config, text: str) -> Outcome:
             if state["raw"].startswith("@") and "\n" not in state["raw"]:
                 body_text = ""
             out_view.get_buffer().set_text(body_text)
-            note.set_visible(bool(note_text))
-            note.set_label(f"💡 {note_text}" if note_text else "")
+            note_box.set_visible(bool(note_text))
+            note.set_label(note_text or "")
             refresh_info()
 
         def on_chunk(chunk: str) -> None:
@@ -114,7 +130,7 @@ def show(cfg: Config, text: str) -> Outcome:
             state["raw"] = ""
             if not source_text:
                 out_view.get_buffer().set_text("")
-                note.set_visible(False)
+                note_box.set_visible(False)
                 spinner.set_visible(False)
                 return False
             system = prompts.translate_system(
@@ -168,6 +184,8 @@ def show(cfg: Config, text: str) -> Outcome:
         context_toggle.connect("notify::active", lambda *_: translate_now())
         swap.connect("clicked", lambda *_: swap_languages())
 
+        paste_btn.connect("clicked", lambda *_: finish("replace"))
+        copy_btn.connect("clicked", lambda *_: finish("copy"))
         shortcut(win, "<Control>Return", lambda: finish("replace"))
         shortcut(win, "<Control><Shift>c", lambda: finish("copy"))
         shortcut(win, "<Control>s", swap_languages)

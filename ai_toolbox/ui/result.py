@@ -12,11 +12,11 @@ from .. import providers
 from ..config import Model
 from ..editing import next_input
 from ..i18n import t
-from .common import (Adw, GLib, Gtk, buffer_text, clear_diff, idle, run_window,
-                     shortcut, show_diff, text_view)
+from .common import (Adw, GLib, Gtk, buffer_text, clear_diff, hint_bar, idle, run_window,
+                     shortcut, show_diff, stat_pill, text_view)
 
 DIFF_DEBOUNCE_MS = 250
-KEYS = ("Ctrl+Enter replace", "Ctrl+Shift+C copy", "Ctrl+R retry", "Esc close")
+KEYS = [("Ctrl+R", "retry"), ("Esc", "close")]
 
 
 @dataclass
@@ -25,10 +25,13 @@ class Outcome:
     text: str = ""
 
 
-def _pane(title: str, view_scroller: Gtk.Widget) -> Gtk.Box:
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-    box.append(Gtk.Label(label=title, xalign=0, css_classes=["atb-hint"]))
-    box.append(view_scroller)
+def _pane(title: str, scroller: Gtk.Widget, pill: Gtk.Label) -> Gtk.Box:
+    head = Gtk.Box(spacing=8)
+    head.append(Gtk.Label(label=title.upper(), xalign=0, css_classes=["atb-pane-title"]))
+    head.append(pill)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    box.append(head)
+    box.append(scroller)
     return box
 
 
@@ -40,28 +43,31 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
     def build(app: Adw.Application) -> Adw.ApplicationWindow:
         win = Adw.ApplicationWindow(application=app, title=f"AI Toolbox · {title}",
                                     default_width=820, default_height=600)
+        replace_btn = Gtk.Button(label=t("Replace"), tooltip_text="Ctrl+Enter",
+                                 css_classes=["suggested-action", "atb-action"])
+        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic", tooltip_text=f"{t('Copy')} (Ctrl+Shift+C)",
+                              css_classes=["flat", "circular"])
         header = Adw.HeaderBar(title_widget=Adw.WindowTitle(
             title=title, subtitle=f"{model.provider} · {model.model}"))
-        spinner = Adw.Spinner()
-        header.pack_end(spinner)
+        header.pack_end(replace_btn)
+        header.pack_end(copy_btn)
 
         in_scroll, in_view = text_view(editable=True)
         out_scroll, out_view = text_view(editable=True)
-        status = Gtk.Label(xalign=0, wrap=True, css_classes=["atb-hint"])
-        hints = Gtk.Label(label="  ·  ".join(t(k) for k in KEYS), xalign=1,
-                          hexpand=True, css_classes=["atb-hint"])
+        removed_pill, added_pill = stat_pill("del"), stat_pill("add")
+        status = Gtk.Label(xalign=0, hexpand=True, ellipsize=3, css_classes=["atb-hint"])
         footer = Gtk.Box(spacing=12)
         footer.append(status)
-        footer.append(hints)
+        footer.append(hint_bar(KEYS))
 
         panes = Gtk.Paned(orientation=Gtk.Orientation.VERTICAL, wide_handle=True,
                           vexpand=True, shrink_start_child=False, shrink_end_child=False)
-        panes.set_start_child(_pane(t("Original"), in_scroll))
-        panes.set_end_child(_pane(t("Result"), out_scroll))
+        panes.set_start_child(_pane(t("Original"), in_scroll, removed_pill))
+        panes.set_end_child(_pane(t("Result"), out_scroll, added_pill))
         panes.set_position(200)
 
-        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8,
-                       margin_start=14, margin_end=14, margin_bottom=12, margin_top=4)
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
+                       margin_start=16, margin_end=16, margin_bottom=12, margin_top=4)
         body.append(panes)
         body.append(footer)
         toolbar = Adw.ToolbarView(content=body)
@@ -76,10 +82,21 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
             view.get_buffer().set_text(text)
             state["quiet"] = False
 
+        def set_status(text: str, thinking: bool = False) -> None:
+            status.set_label(text)
+            (status.add_css_class if thinking else status.remove_css_class)("atb-thinking")
+
+        def diff() -> None:
+            removed, added = show_diff(in_view, out_view)
+            removed_pill.set_label(f"−{removed}")
+            added_pill.set_label(f"+{added}")
+            removed_pill.set_visible(removed > 0)
+            added_pill.set_visible(added > 0)
+
         def refresh_diff() -> bool:
             state["timer"] = 0
             if not state["streaming"]:
-                show_diff(in_view, out_view)
+                diff()
             return False
 
         def on_edit(which: str) -> None:
@@ -98,16 +115,16 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
 
         def on_done(error: str | None) -> None:
             state["streaming"] = False
-            spinner.set_visible(False)
+            replace_btn.set_sensitive(True)
             if error:
-                status.set_label(t("Error: {err}", err=error))
+                set_status(t("Error: {err}", err=error))
                 return
             result = buffer_text(out_view).strip()
             set_text(out_view, result)
             state["in_edited"] = state["out_edited"] = False
-            show_diff(in_view, out_view)
+            diff()
             same = result == buffer_text(in_view).strip()
-            status.set_label(t("No changes.") if same else "")
+            set_status(t("No changes.") if same else "")
             out_view.grab_focus()
 
         def start(text: str) -> None:
@@ -116,8 +133,10 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
             set_text(in_view, text)
             set_text(out_view, "")
             clear_diff(in_view, out_view)
-            status.set_label("")
-            spinner.set_visible(True)
+            removed_pill.set_visible(False)
+            added_pill.set_visible(False)
+            replace_btn.set_sensitive(False)
+            set_status(t("Thinking…"), thinking=True)
             state["streaming"] = True
             state["run"] = providers.stream_in_thread(
                 model, system, render(text), idle(on_chunk), idle(on_done))
@@ -140,6 +159,8 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
 
         in_view.get_buffer().connect("changed", lambda *_: on_edit("in_edited"))
         out_view.get_buffer().connect("changed", lambda *_: on_edit("out_edited"))
+        replace_btn.connect("clicked", lambda *_: finish("replace"))
+        copy_btn.connect("clicked", lambda *_: finish("copy"))
         shortcut(win, "<Control>Return", lambda: finish("replace"))
         shortcut(win, "<Control><Shift>c", lambda: finish("copy"))
         shortcut(win, "<Control>r", retry)
