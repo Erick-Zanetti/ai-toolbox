@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import difflib
-import re
-
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+
+from ..editing import word_diff  # noqa: E402
 
 APP_ID = "dev.aitoolbox.AiToolbox"
 
@@ -22,9 +21,6 @@ CSS = """
 .atb-note { font-size: 13px; padding: 8px 12px; border-radius: 10px;
               background: alpha(@accent_bg_color, 0.12); }
 """
-
-_TOKENS = re.compile(r"\s+|\w+|[^\w\s]", re.UNICODE)
-
 
 def install_css() -> None:
     provider = Gtk.CssProvider()
@@ -49,30 +45,45 @@ def buffer_text(view: Gtk.TextView) -> str:
     return buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
 
 
-def highlight_changes(view: Gtk.TextView, before: str) -> None:
-    """Tint the words of the view's text that differ from `before`."""
-    buf = view.get_buffer()
-    tag = buf.get_tag_table().lookup("changed")
+# Fixed hues (readable on light and dark), softened with alpha.
+ADDED_RGBA = (0.18, 0.76, 0.49, 0.30)
+REMOVED_RGBA = (0.88, 0.11, 0.14, 0.28)
+
+
+def _rgba(values: tuple[float, float, float, float]) -> Gdk.RGBA:
+    color = Gdk.RGBA()
+    color.red, color.green, color.blue, color.alpha = values
+    return color
+
+
+def _tag(buf: Gtk.TextBuffer, name: str) -> Gtk.TextTag:
+    tag = buf.get_tag_table().lookup(name)
     if tag is None:
-        # Theme accent (follows the system accent / matugen colors), softened.
-        accent = Adw.StyleManager.get_default().get_accent_color_rgba()
-        accent.alpha = 0.3
-        tag = buf.create_tag("changed", background_rgba=accent)
+        if name == "removed":
+            tag = buf.create_tag(name, background_rgba=_rgba(REMOVED_RGBA), strikethrough=True)
+        else:
+            tag = buf.create_tag(name, background_rgba=_rgba(ADDED_RGBA))
+    return tag
+
+
+def _paint(view: Gtk.TextView, name: str, spans: list[tuple[int, int]]) -> None:
+    buf = view.get_buffer()
+    tag = _tag(buf, name)
     buf.remove_tag(tag, buf.get_start_iter(), buf.get_end_iter())
+    for start, end in spans:
+        buf.apply_tag(tag, buf.get_iter_at_offset(start), buf.get_iter_at_offset(end))
 
-    old = _TOKENS.findall(before)
-    new = _TOKENS.findall(buffer_text(view))
-    offsets, pos = [], 0
-    for token in new:
-        offsets.append(pos)
-        pos += len(token)
-    offsets.append(pos)
 
-    matcher = difflib.SequenceMatcher(a=old, b=new, autojunk=False)
-    for op, _, _, j1, j2 in matcher.get_opcodes():
-        if op in ("replace", "insert") and j1 < j2:
-            buf.apply_tag(tag, buf.get_iter_at_offset(offsets[j1]),
-                          buf.get_iter_at_offset(offsets[j2]))
+def show_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> None:
+    """Red strike-through on what left `before_view`, green on what is new in `after_view`."""
+    removed, added = word_diff(buffer_text(before_view), buffer_text(after_view))
+    _paint(before_view, "removed", removed)
+    _paint(after_view, "added", added)
+
+
+def clear_diff(before_view: Gtk.TextView, after_view: Gtk.TextView) -> None:
+    _paint(before_view, "removed", [])
+    _paint(after_view, "added", [])
 
 
 def shortcut(widget: Gtk.Widget, accel: str, callback) -> None:

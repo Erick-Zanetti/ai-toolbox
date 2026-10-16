@@ -216,3 +216,21 @@ def test_copy_fallback_is_off_by_default_and_never_hits_terminals(monkeypatch):
     import dataclasses
     on = dataclasses.replace(cfg, copy_fallback=True)
     assert cli._capture(on).text == "" and calls == []  # foot is a terminal
+
+
+def test_retry_runs_on_the_result_with_edits():
+    from ai_toolbox.editing import next_input
+
+    assert next_input("orig", "result + my edit", False, True) == "result + my edit"
+    assert next_input("orig", "result", False, False) == "result"
+    assert next_input("orig edited", "result", True, False) == "orig edited"
+    assert next_input("orig", "  ", False, False) == "orig"
+
+
+def test_word_diff_marks_removed_and_added_spans():
+    from ai_toolbox.editing import word_diff
+
+    before, after = "I goes to store", "I went to the store"
+    removed, added = word_diff(before, after)
+    assert [before[a:b] for a, b in removed] == ["goes"]
+    assert [after[a:b] for a, b in added] == ["went", "the "]

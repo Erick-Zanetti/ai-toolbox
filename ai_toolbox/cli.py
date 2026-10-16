@@ -82,7 +82,7 @@ def _run(cmd: config.Command, cfg: config.Config, inv: Invocation, force_window:
     from .ui import result
 
     outcome = result.show(cmd.name, cmd.model, prompts.COMMAND_SYSTEM,
-                          prompts.render(cmd.prompt, inv.text, cfg.context), inv.text)
+                          lambda text: prompts.render(cmd.prompt, text, cfg.context), inv.text)
     _deliver(outcome.action, outcome.text, inv, cfg)
     return 0
 

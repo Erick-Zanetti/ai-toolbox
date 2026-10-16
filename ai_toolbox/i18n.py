@@ -22,6 +22,8 @@ _PT = {
     "{name}: select some text first.": "{name}: selecione um texto primeiro.",
     "Error: {err}": "Erro: {err}",
     "No changes.": "Sem mudanças.",
+    "Original": "Original",
+    "Result": "Resultado",
     "Ctrl+Enter replace": "Ctrl+Enter substituir",
     "Ctrl+Shift+C copy": "Ctrl+Shift+C copiar",
     "Ctrl+R retry": "Ctrl+R refazer",
