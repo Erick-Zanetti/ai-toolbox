@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import threading
 
-from . import config, desktop, prompts, providers
+from . import config, desktop, dictation, prompts, providers
 from .cli import SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver, notify
 from .i18n import t
 from .ui.common import APP_ID, Adw, Gio, GLib, idle, install_css  # noqa: F401
@@ -21,6 +21,8 @@ class ToolboxApp(Adw.Application):
         super().__init__(application_id=APP_ID,
                          flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.connect("startup", lambda *_: install_css())
+        self.engine: dictation.Engine | None = None
+        self.dictating: dict | None = None
         # Fast path for later calls: `gdbus call ... ActivateAction cmdline`
         # (see cli.forward), no Python/GObject start-up on the caller side.
         action = Gio.SimpleAction.new("cmdline", GLib.VariantType("as"))
@@ -55,6 +57,9 @@ class ToolboxApp(Adw.Application):
             self.open_settings()
             return 0
         cfg = config.load()  # fresh on every call: edits apply without a restart
+        if args.action == "dictate":
+            self.dictate(cfg, args.then if args.then is not None else cfg.dictation.then, args.cancel)
+            return 0
         if args.action in ("run", "window"):
             cmd = cfg.commands.get(args.command)
             if cmd is None:
@@ -159,6 +164,90 @@ class ToolboxApp(Adw.Application):
             self.open_settings()
         else:
             self.run_command(cfg.commands[choice], cfg, inv, force_window=False)
+
+    # ── Dictation ──────────────────────────────────────────────────────────
+
+    def dictate(self, cfg: config.Config, then: str, cancel: bool) -> None:
+        """Toggle: the first call starts recording, the next one transcribes."""
+        if self.dictating:
+            self._cancel_dictation() if cancel else self._finish_dictation()
+            return
+        if cancel:
+            return
+        from .ui.dictation import Pill
+
+        desk = desktop.detect()
+        inv = Invocation("", desk.focused(), desk)
+        try:
+            recorder = dictation.Recorder()
+        except dictation.DictationError as err:
+            notify(cfg, "error", t("Dictation failed: {err}", err=err))
+            return
+        pill = Pill(self, self._finish_dictation, self._cancel_dictation)
+        self.dictating = {"recorder": recorder, "pill": pill, "inv": inv, "cfg": cfg,
+                          "then": then, "busy": False}
+        self.hold()
+        pill.present()
+
+    def _end_dictation(self) -> None:
+        session, self.dictating = self.dictating, None
+        if session:
+            session["pill"].close()
+            self.release()
+
+    def _cancel_dictation(self) -> None:
+        if self.dictating and not self.dictating["busy"]:
+            self.dictating["recorder"].cancel()
+            self._end_dictation()
+
+    def _engine(self, settings: config.Dictation, on_status) -> dictation.Engine:
+        if self.engine is None or self.engine.settings != settings:
+            self.engine = dictation.Engine(settings)
+            GLib.timeout_add_seconds(60, lambda: (self.engine and self.engine.unload_if_idle(), True)[1])
+        self.engine.on_status = on_status
+        return self.engine
+
+    def _finish_dictation(self) -> None:
+        session = self.dictating
+        if not session or session["busy"]:
+            return
+        session["busy"] = True
+        cfg, pill = session["cfg"], session["pill"]
+        try:
+            wav = session["recorder"].stop()
+        except dictation.DictationError as err:
+            notify(cfg, "error", t("Dictation failed: {err}", err=err))
+            self._end_dictation()
+            return
+        pill.set_state("transcribing")
+        engine = self._engine(cfg.dictation, idle(lambda state: pill.set_state(state)))
+        command = cfg.commands.get(session["then"]) if session["then"] else None
+
+        def work() -> None:
+            text, error = "", None
+            try:
+                text = engine.transcribe(wav)
+                if text and command:
+                    idle(lambda: pill.set_state("thinking", name=command.name))()
+                    text = providers.complete(
+                        command.model, prompts.command_system(cfg.glossary),
+                        prompts.render(command.prompt, text, cfg.context))
+            except (dictation.DictationError, providers.ProviderError) as err:
+                error = str(err)
+            finally:
+                wav.unlink(missing_ok=True)
+            idle(done)(text, error)
+
+        def done(text: str, error: str | None) -> None:
+            self._end_dictation()
+            if error:
+                notify(cfg, "error", t("Dictation failed: {err}", err=error))
+            elif not text.strip():
+                notify(cfg, "warn", t("Nothing heard."))
+            else:
+                deliver("replace", text.strip(), session["inv"], cfg)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def open_settings(self) -> None:
         for window in self.get_windows():

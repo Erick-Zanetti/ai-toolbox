@@ -143,6 +143,7 @@ class Settings:
                          lambda v: self._set(self.data, "glossary",
                                              [x.strip() for x in v.split(",") if x.strip()] or None)))
         page.add(words)
+        page.add(self._dictation_group())
 
         accounts = Adw.PreferencesGroup(
             title=t("AI accounts"),
@@ -175,6 +176,29 @@ class Settings:
             accounts.add(add)
         page.add(accounts)
         return page
+
+    def _dictation_group(self) -> Adw.PreferencesGroup:
+        spec = self.data.setdefault("dictation", {})
+        group = Adw.PreferencesGroup(
+            title=t("Dictation"),
+            description=t("Local Whisper speech-to-text. The first use downloads the model."))
+        devices = ("auto", "cuda", "cpu")
+        device = spec.get("device", "auto")
+        group.add(_combo(t("Device"), [t("Automatic (GPU when available)"), "NVIDIA GPU", "CPU"],
+                         devices.index(device) if device in devices else 0,
+                         lambda i: self._set(spec, "device", devices[i])))
+        group.add(_entry(t("GPU model"), spec.get("model", "large-v3-turbo"),
+                         lambda v: self._set(spec, "model", v)))
+        group.add(_entry(t("CPU model"), spec.get("cpu_model", "small"),
+                         lambda v: self._set(spec, "cpu_model", v)))
+        group.add(_entry(t("Language (empty = detect)"), spec.get("language", ""),
+                         lambda v: self._set(spec, "language", v)))
+        names = [t("Paste as spoken"), *self.commands]
+        then = spec.get("then", "")
+        group.add(_combo(t("After transcribing"), names,
+                         names.index(then) if then in names else 0,
+                         lambda i: self._set(spec, "then", "" if i == 0 else names[i])))
+        return group
 
     def _add_ollama(self) -> None:
         self.data.setdefault("providers", {})["ollama"] = {

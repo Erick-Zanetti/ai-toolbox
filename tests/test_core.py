@@ -350,3 +350,55 @@ def test_portal_unavailable_without_gi_returns_false(monkeypatch):
     monkeypatch.setattr(portal, "_instance", None)
     monkeypatch.setattr(portal, "_available", None)
     assert portal.send_shortcut("v", False) is False
+
+
+def test_dictation_settings_load_and_validate(tmp_path):
+    (tmp_path / "config.toml").write_text(
+        '[providers.claude]\nmodel = "haiku"\n[dictation]\nlanguage = "pt"\nthen = "fix-spelling"\n')
+    settings = config.load(tmp_path).dictation
+    assert (settings.language, settings.then, settings.model) == ("pt", "fix-spelling", "large-v3-turbo")
+    expected = ("pt", "fix-spelling", "large-v3-turbo")
+    assert (settings.language, settings.then, settings.model) == expected
+    with pytest.raises(config.ConfigError):
+        config.load(tmp_path)
+    (tmp_path / "config.toml").write_text('[providers.claude]\nmodel = "haiku"\n[dictation]\nmodle = "x"\n')
+    with pytest.raises(config.ConfigError):
+        config.load(tmp_path)
+
+
+def test_recorder_asks_for_16khz_mono(monkeypatch, tmp_path):
+    from ai_toolbox import dictation
+
+    monkeypatch.setattr(dictation.shutil, "which", lambda name: f"/usr/bin/{name}")
+    argv = dictation.record_argv(tmp_path / "a.wav")
+    assert argv[:7] == ["pw-record", "--rate", "16000", "--channels", "1", "--format", "s16"]
+
+
+def test_stt_worker_protocol_with_fake_model(tmp_path):
+    """Run the real worker script with a stub faster_whisper module."""
+    import json
+    import subprocess
+    import sys
+    import wave
+
+    fake = tmp_path / "fake"
+    (fake / "faster_whisper").mkdir(parents=True)
+    (fake / "faster_whisper" / "__init__.py").write_text(
+        "class _I:\n    language = 'pt'\n"
+        "class _S:\n    text = ' olá mundo '\n"
+        "class WhisperModel:\n"
+        "    def __init__(self, *a, **k): pass\n"
+        "    def transcribe(self, audio, **k): return [_S()], _I()\n")
+    wav = tmp_path / "a.wav"
+    with wave.open(str(wav), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(b"\0\0" * 1600)
+    worker = Path(__file__).resolve().parent.parent / "ai_toolbox" / "stt_worker.py"
+    pytest.importorskip("numpy")
+    proc = subprocess.run([sys.executable, str(worker), "m", "cpu", "int8"],
+                          input=json.dumps({"wav": str(wav)}) + "\n", text=True,
+                          capture_output=True, env={"PYTHONPATH": str(fake)}, timeout=30)
+    lines = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert lines == [{"ready": True, "device": "cpu"}, {"text": "olá mundo", "language": "pt"}]

@@ -14,7 +14,7 @@ jobs:
       - name: System packages (PyGObject, D-Bus)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends python3-gi dbus
+          sudo apt-get install -y --no-install-recommends python3-gi python3-numpy dbus
 
       - name: Lint
         run: pipx run ruff check ai_toolbox tests scripts

@@ -18,6 +18,10 @@ Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</
 - **Ask for changes.** A field under the result takes free instructions
   ("more formal", "as bullet points") and reworks the current result; Ctrl+R
   reruns the command on it, including your edits.
+- **Dictation.** Press a shortcut, talk, press it again: local Whisper
+  (large-v3-turbo on an NVIDIA GPU, ~0.4 s for a sentence; a small model on
+  the CPU otherwise) types the text where you were. `--then fix-spelling`
+  (or any command) cleans it up first. Nothing leaves your machine.
 - **Personal dictionary.** Product names and jargon that no command or
   translation ever changes.
 - **Command palette.** One shortcut lists every command; type to filter, Enter to run.
@@ -70,6 +74,10 @@ and a notification tells you to press Ctrl+V.
 Text comes from the primary selection: just highlight it. For apps without
 one, `copy_fallback = true` sends them a Ctrl+C instead (never to terminals).
 
+Dictation also needs [uv](https://docs.astral.sh/uv) and PipeWire (`pw-record`):
+the first use creates `~/.local/share/ai-toolbox/stt-venv` with faster-whisper
+(plus the CUDA libraries on NVIDIA, ~1 GB in total) and downloads the model.
+
 ## Install
 
 Arch (AUR-style package in [`packaging/arch`](packaging/arch/PKGBUILD)):
@@ -104,11 +112,16 @@ Bind these in your compositor:
 | Super+Alt+C | `ai-toolbox run fix-spelling` |
 | Super+Alt+T | `ai-toolbox translate` |
 | Super+Alt+Space | `ai-toolbox` (palette) |
+| Super+Alt+D | `ai-toolbox dictate` (again to stop) |
+| Super+Alt+Shift+D | `ai-toolbox dictate --then fix-spelling` |
 
 Hyprland (Lua config):
 
 ```lua
 hl.window_rule({ match = { class = "dev.aitoolbox.AiToolbox" }, float = true, center = true })
+-- the dictation pill: bottom center, on every workspace
+hl.window_rule({ match = { class = "dev.aitoolbox.AiToolbox", title = "^AI Toolbox · Dictation$" },
+                 float = true, pin = true, move = { "((monitor_w-window_w)/2)", "(monitor_h-window_h-80)" } })
 ```
 
 Sway: `for_window [app_id="dev.aitoolbox.AiToolbox"] floating enable`.
@@ -122,6 +135,7 @@ ai-toolbox run <command>      run on the selection (output from the command file
 ai-toolbox window <command>   same, always showing the result window
 ai-toolbox translate          translator, prefilled with the selection
                               (--empty: start empty, --context: with context on)
+ai-toolbox dictate            start/stop dictation (--then <command>, --cancel)
 ai-toolbox settings           settings window
 ai-toolbox list               list commands
 ai-toolbox daemon             stay running so windows open instantly

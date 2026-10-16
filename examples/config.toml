@@ -34,6 +34,15 @@ reasoning = "low"
 # model = "llama3.2"
 # api_key_env = "MY_API_KEY"   # only for endpoints that need a key
 
+[dictation]
+# Local speech-to-text (Whisper). First use installs it (~1 GB with GPU libs).
+model = "large-v3-turbo"   # NVIDIA GPU
+cpu_model = "small"        # no GPU: tiny, base, small, medium
+device = "auto"            # auto | cuda | cpu
+language = ""              # "" = detect, or "pt", "en"...
+then = ""                  # e.g. "fix-spelling": run a command on the transcript first
+idle_unload_minutes = 10
+
 [translate]
 # "Auto" target: text in one of these goes to the other.
 pair = ["English", "Portuguese (Brazil)"]

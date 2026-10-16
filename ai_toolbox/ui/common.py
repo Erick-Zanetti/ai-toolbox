@@ -38,6 +38,7 @@ CSS = """
 .atb-ask { min-height: 38px; border-radius: 10px; }
 .atb-lang > button { border-radius: 999px; padding-left: 14px; padding-right: 10px; }
 .atb-tile > image { color: @accent_color; -gtk-icon-style: symbolic; }
+.atb-rec-dot { color: #e01b24; font-size: 18px; animation: atb-pulse 0.7s ease-in-out infinite alternate; }
 @keyframes atb-pulse { from { opacity: 0.35; } to { opacity: 0.95; } }
 .atb-thinking { font-size: 12px; animation: atb-pulse 0.8s ease-in-out infinite alternate; }
 """

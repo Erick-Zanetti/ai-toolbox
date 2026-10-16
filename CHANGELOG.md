@@ -5,6 +5,8 @@ All notable changes to this project. Dates are YYYY-MM-DD.
 ## Unreleased
 
 ### Added
+- Dictation: local Whisper speech-to-text (GPU or CPU), a recording pill,
+  `ai-toolbox dictate [--then <command>]`, settings for model and language.
 - Daemon mode: `ai-toolbox daemon` (and `ai-toolbox.service`) keeps one
   instance running; later calls reach it through a gdbus fast path, so
   windows open almost instantly.

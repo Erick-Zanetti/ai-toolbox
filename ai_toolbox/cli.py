@@ -5,6 +5,7 @@
   ai-toolbox window <command>    same, but always show the result window
   ai-toolbox translate           translator window, prefilled with the selection
   ai-toolbox settings            settings window
+  ai-toolbox dictate             start/stop dictation (--then <command>, --cancel)
   ai-toolbox list                list commands
   ai-toolbox daemon              stay running so windows open instantly
 """
@@ -80,6 +81,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("translate")
     p.add_argument("--empty", action="store_true", help="ignore the current selection")
     p.add_argument("--context", action="store_true", help="start with translation with context on")
+    p = sub.add_parser("dictate")
+    p.add_argument("--then", metavar="COMMAND", help="run a command on the transcript before pasting")
+    p.add_argument("--cancel", action="store_true", help="stop without pasting")
     for action in ("list", "palette", "settings", "daemon"):
         sub.add_parser(action)
     return parser

@@ -61,6 +61,16 @@ class Translate:
 
 
 @dataclass(frozen=True)
+class Dictation:
+    model: str = "large-v3-turbo"  # on the GPU
+    cpu_model: str = "small"  # without a usable NVIDIA GPU
+    device: str = "auto"  # auto | cuda | cpu
+    language: str = ""  # "" = detect; or "pt", "en"...
+    then: str = ""  # command applied to the transcript before pasting
+    idle_unload_minutes: int = 10  # free the GPU memory when unused
+
+
+@dataclass(frozen=True)
 class Config:
     default: Model
     translate: Translate
@@ -69,6 +79,7 @@ class Config:
     copy_fallback: bool = False
     notifications: str = "all"  # all | errors | off
     glossary: tuple[str, ...] = ()  # terms the AI must never change
+    dictation: Dictation = Dictation()
     commands: dict[str, Command] = field(default_factory=dict)
 
 
@@ -132,6 +143,17 @@ def ensure_user_config(config_dir: Path = CONFIG_DIR) -> None:
     shutil.copytree(source, config_dir, dirs_exist_ok=True)
 
 
+def _dictation(raw: dict) -> Dictation:
+    known = {f for f in Dictation.__dataclass_fields__}
+    unknown = set(raw) - known
+    if unknown:
+        raise ConfigError(f"[dictation]: unknown keys {sorted(unknown)}")
+    settings = Dictation(**raw)
+    if settings.device not in ("auto", "cuda", "cpu"):
+        raise ConfigError("dictation.device must be auto, cuda or cpu")
+    return settings
+
+
 def load(config_dir: Path = CONFIG_DIR) -> Config:
     if config_dir == CONFIG_DIR:
         ensure_user_config(config_dir)
@@ -176,5 +198,6 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
         copy_fallback=bool(raw.get("copy_fallback", False)),
         notifications=notifications,
         glossary=tuple(str(term) for term in raw.get("glossary", ()) if str(term).strip()),
+        dictation=_dictation(raw.get("dictation", {})),
         commands=commands,
     )
