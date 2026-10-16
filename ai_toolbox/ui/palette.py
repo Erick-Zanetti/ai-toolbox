@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from ..config import Config
 from ..i18n import t
 from .common import Adw, Gtk, hint_bar, icon_tile, run_window, shortcut
@@ -32,7 +34,8 @@ def _selection_chip(selection: str) -> Gtk.Widget:
     return chip
 
 
-def show(cfg: Config, selection: str) -> str | None:
+def open_window(app: Adw.Application, cfg: Config, selection: str,
+                on_finish: Callable[[str | None], None]) -> Adw.ApplicationWindow:
     chosen: dict[str, str | None] = {"id": None}
 
     def build(app: Adw.Application) -> Adw.ApplicationWindow:
@@ -111,5 +114,12 @@ def show(cfg: Config, selection: str) -> str | None:
         search.grab_focus()
         return win
 
-    run_window(build)
-    return chosen["id"]
+    win = build(app)
+    win.connect("destroy", lambda *_: on_finish(chosen["id"]))
+    return win
+
+
+def show(cfg: Config, selection: str) -> str | None:
+    box: dict = {}
+    run_window(lambda app: open_window(app, cfg, selection, lambda value: box.setdefault("v", value)))
+    return box.get("v")

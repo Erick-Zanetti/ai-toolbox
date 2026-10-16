@@ -211,11 +211,11 @@ def test_copy_fallback_is_off_by_default_and_never_hits_terminals(monkeypatch):
     monkeypatch.setattr(desktop, "detect", lambda: Fake())
     monkeypatch.setattr(desktop, "selection", lambda: "")
     cfg = config.load(EXAMPLES)
-    assert cli._capture(cfg).text == "" and calls == []
+    assert cli.capture(cfg).text == "" and calls == []
 
     import dataclasses
     on = dataclasses.replace(cfg, copy_fallback=True)
-    assert cli._capture(on).text == "" and calls == []  # foot is a terminal
+    assert cli.capture(on).text == "" and calls == []  # foot is a terminal
 
 
 def test_retry_runs_on_the_result_with_edits():
@@ -289,7 +289,7 @@ def test_notification_levels(monkeypatch):
     for level in ("all", "errors", "off"):
         c = dataclasses.replace(cfg, notifications=level)
         for kind in ("info", "warn", "error"):
-            cli._notify(c, kind, f"{level}-{kind}")
+            cli.notify(c, kind, f"{level}-{kind}")
     assert sent == ["all-info", "all-warn", "all-error", "errors-warn", "errors-error"]
 
 
@@ -317,3 +317,7 @@ def test_language_placeholder_uses_system_language(monkeypatch):
 def test_explain_command_has_no_diff():
     assert config.load(EXAMPLES).commands["explain"].diff is False
     assert config.load(EXAMPLES).commands["shorten"].diff is True
+
+
+def test_refine_wraps_text_after_instruction():
+    assert prompts.refine("  more formal ", "hey") == "more formal\n\n<text>\nhey\n</text>"

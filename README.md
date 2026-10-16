@@ -15,6 +15,11 @@ Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</
   TOML file with a prompt. `output = "replace"` swaps the selection in place,
   no window; `output = "window"` shows the result first, streaming, with the
   changed words highlighted. Ctrl+Enter puts it back over the selection.
+- **Ask for changes.** A field under the result takes free instructions
+  ("more formal", "as bullet points") and reworks the current result; Ctrl+R
+  reruns the command on it, including your edits.
+- **Personal dictionary.** Product names and jargon that no command or
+  translation ever changes.
 - **Command palette.** One shortcut lists every command; type to filter, Enter to run.
 - **Translator.** Source on top, translation below, live as you type, language
   detected on the fly. Literal by default; **With context** (Ctrl+I) adapts the
@@ -76,6 +81,15 @@ ln -s "$PWD/bin/ai-toolbox" ~/.local/bin/ai-toolbox
 
 The first run copies the example config to `~/.config/ai-toolbox/`.
 
+For instant windows, keep it running (the package ships the unit):
+
+```sh
+systemctl --user enable --now ai-toolbox.service   # runs `ai-toolbox daemon`
+```
+
+Without it everything still works; each call just starts its own process.
+After updating a checkout, `systemctl --user restart ai-toolbox`.
+
 ### Shortcuts
 
 Bind these in your compositor:
@@ -103,13 +117,14 @@ ai-toolbox run <command>      run on the selection (output from the command file
 ai-toolbox window <command>   same, always showing the result window
 ai-toolbox translate          translator, prefilled with the selection
                               (--empty: start empty, --context: with context on)
-ai-toolbox list               list commands
 ai-toolbox settings           settings window
+ai-toolbox list               list commands
+ai-toolbox daemon             stay running so windows open instantly
 ```
 
 | Window | Keys |
 |---|---|
-| Result | Ctrl+Enter replace · Ctrl+Shift+C copy · Ctrl+R retry · Esc close |
+| Result | Ctrl+Enter replace · Ctrl+Shift+C copy · Ctrl+L ask for a change · Ctrl+R retry · Esc close |
 | Translator | Ctrl+Enter paste into app · Ctrl+Shift+C copy · Ctrl+S swap · Ctrl+I with context · Ctrl+P / Ctrl+Shift+P target / source · Esc clear, then close |
 
 ## Configuration
@@ -148,7 +163,9 @@ Rewrite the text in a warmer, friendlier tone. Keep the meaning and language.
 ```
 
 Placeholders: `{selection}`, `{clipboard}`, `{context}` (the contents of
-`context.md`). Without `{selection}` the text is appended to the prompt.
+`context.md`), `{language}` (the system language, e.g. for "explain in
+{language}"). `diff = false` turns off change highlighting for commands whose
+answer is not a new version of the text (like Explain). Without `{selection}` the text is appended to the prompt.
 
 ## Development
 

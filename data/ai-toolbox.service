@@ -1,0 +1,12 @@
+[Unit]
+Description=AI Toolbox (keeps its windows instant)
+Documentation=https://github.com/Erick-Zanetti/ai-toolbox
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/ai-toolbox daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

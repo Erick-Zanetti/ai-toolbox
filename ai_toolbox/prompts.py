@@ -29,6 +29,11 @@ def command_system(glossary: tuple[str, ...] = ()) -> str:
     return f"{COMMAND_SYSTEM} {rule}" if rule else COMMAND_SYSTEM
 
 
+def refine(instruction: str, text: str) -> str:
+    """Follow-up typed in the result window: apply a free instruction to the text."""
+    return f"{instruction.strip()}\n\n<text>\n{text}\n</text>"
+
+
 LANG_MARK = "@lang "
 NOTE_MARK = "@note "
 

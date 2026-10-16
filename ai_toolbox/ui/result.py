@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .. import providers
+from .. import prompts, providers
 from ..config import Model
 from ..editing import next_input
 from ..i18n import t
@@ -16,7 +16,7 @@ from .common import (Adw, GLib, Gtk, buffer_text, clear_diff, hint_bar, idle, ru
                      shortcut, show_diff, stat_pill, text_view)
 
 DIFF_DEBOUNCE_MS = 250
-KEYS = [("Ctrl+R", "retry"), ("Esc", "close")]
+KEYS = [("Ctrl+L", "ask"), ("Ctrl+R", "retry"), ("Esc", "close")]
 
 
 @dataclass
@@ -35,8 +35,9 @@ def _pane(title: str, scroller: Gtk.Widget, pill: Gtk.Label) -> Gtk.Box:
     return box
 
 
-def show(title: str, model: Model, system: str, render: Callable[[str], str],
-         original: str, with_diff: bool = True) -> Outcome:
+def open_window(app: Adw.Application, title: str, model: Model, system: str,
+                render: Callable[[str], str], original: str, with_diff: bool,
+                on_finish: Callable[[Outcome], None]) -> Adw.ApplicationWindow:
     """`render(text)` builds the user prompt for a given input text."""
     outcome = Outcome()
 
@@ -68,7 +69,11 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
 
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
                        margin_start=16, margin_end=16, margin_bottom=12, margin_top=4)
+        ask = Gtk.Entry(placeholder_text=t("Ask for a change… e.g. more formal, as bullet points"),
+                        primary_icon_name="mail-send-symbolic", hexpand=True)
+        ask.add_css_class("atb-ask")
         body.append(panes)
+        body.append(ask)
         body.append(footer)
         toolbar = Adw.ToolbarView(content=body)
         toolbar.add_top_bar(header)
@@ -129,7 +134,7 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
             set_status(t("No changes.") if same else "")
             out_view.grab_focus()
 
-        def start(text: str) -> None:
+        def start(text: str, user: str | None = None) -> None:
             if state["run"]:
                 state["run"].cancel()
             set_text(in_view, text)
@@ -141,11 +146,22 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
             set_status(t("Thinking…"), thinking=True)
             state["streaming"] = True
             state["run"] = providers.stream_in_thread(
-                model, system, render(text), idle(on_chunk), idle(on_done))
+                model, system, user or render(text), idle(on_chunk), idle(on_done))
+
+        def current() -> str:
+            return next_input(buffer_text(in_view), buffer_text(out_view),
+                              state["in_edited"], state["out_edited"])
 
         def retry() -> None:
-            start(next_input(buffer_text(in_view), buffer_text(out_view),
-                             state["in_edited"], state["out_edited"]))
+            start(current())
+
+        def ask_change(*_) -> None:
+            instruction = ask.get_text().strip()
+            if not instruction:
+                return
+            text = current()
+            ask.set_text("")
+            start(text, prompts.refine(instruction, text))
 
         def finish(action: str | None) -> None:
             if state["run"]:
@@ -166,11 +182,21 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
         shortcut(win, "<Control>Return", lambda: finish("replace"))
         shortcut(win, "<Control><Shift>c", lambda: finish("copy"))
         shortcut(win, "<Control>r", retry)
+        shortcut(win, "<Control>l", ask.grab_focus)
+        ask.connect("activate", ask_change)
         shortcut(win, "Escape", lambda: finish(None))
         win.connect("close-request", on_close)
 
         start(original)
         return win
 
-    run_window(build)
-    return outcome
+    win = build(app)
+    win.connect("destroy", lambda *_: on_finish(outcome))
+    return win
+
+
+def show(title: str, model: Model, system: str, render: Callable[[str], str],
+         original: str, with_diff: bool = True) -> Outcome:
+    box: dict = {}
+    run_window(lambda app: open_window(app, title, model, system, render, original, with_diff, lambda value: box.setdefault("v", value)))
+    return box.get("v")

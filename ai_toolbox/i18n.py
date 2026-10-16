@@ -31,6 +31,8 @@ _PT = {
     "Copy": "Copiar",
     "Thinking…": "Pensando…",
     "retry": "refazer",
+    "ask": "pedir",
+    "Ask for a change… e.g. more formal, as bullet points": "Pedir uma mudança… ex.: mais formal, em tópicos",
     "close": "fechar",
     "swap": "inverter",
     "target": "destino",

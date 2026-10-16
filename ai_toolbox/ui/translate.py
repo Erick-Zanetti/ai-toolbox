@@ -4,6 +4,8 @@ translation to the person described in context.md."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .. import providers, prompts
 from ..config import Config
 from ..i18n import t
@@ -25,7 +27,8 @@ def _dropdown(items: list[str]) -> Gtk.DropDown:
     return dd
 
 
-def show(cfg: Config, text: str, contextual: bool = False) -> Outcome:
+def open_window(app: Adw.Application, cfg: Config, text: str, contextual: bool,
+                on_finish: Callable[[Outcome], None]) -> Adw.ApplicationWindow:
     outcome = Outcome()
     tr = cfg.translate
     languages = list(tr.languages)
@@ -204,5 +207,12 @@ def show(cfg: Config, text: str, contextual: bool = False) -> Outcome:
         refresh_info()
         return win
 
-    run_window(build)
-    return outcome
+    win = build(app)
+    win.connect("destroy", lambda *_: on_finish(outcome))
+    return win
+
+
+def show(cfg: Config, text: str, contextual: bool = False) -> Outcome:
+    box: dict = {}
+    run_window(lambda app: open_window(app, cfg, text, contextual, lambda value: box.setdefault("v", value)))
+    return box.get("v")

@@ -4,19 +4,24 @@
   ai-toolbox run <command>       run on the selected text (output from the command file)
   ai-toolbox window <command>    same, but always show the result window
   ai-toolbox translate           translator window, prefilled with the selection
-  ai-toolbox list                list commands
   ai-toolbox settings            settings window
+  ai-toolbox list                list commands
+  ai-toolbox daemon              stay running so windows open instantly
 """
 
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 
-from . import config, desktop, prompts, providers
+from . import config, desktop
 from .i18n import t
 
+APP_ID = "dev.aitoolbox.AiToolbox"
+OBJECT_PATH = "/" + APP_ID.replace(".", "/")
 TRANSLATE = "translate"
 SETTINGS = "settings"
 
@@ -30,7 +35,7 @@ class Invocation:
     desk: desktop.Desktop
 
 
-def _notify(cfg: config.Config, level: str, body: str, **kw) -> int | None:
+def notify(cfg: config.Config, level: str, body: str, **kw) -> int | None:
     """level: info (progress, done), warn (needs the user), error."""
     if cfg.notifications == "off" or (cfg.notifications == "errors" and level == "info"):
         return None
@@ -41,7 +46,7 @@ def _notify(cfg: config.Config, level: str, body: str, **kw) -> int | None:
     return desktop.notify(body, **kw)
 
 
-def _capture(cfg: config.Config) -> Invocation:
+def capture(cfg: config.Config) -> Invocation:
     desk = desktop.detect()
     target = desk.focused()
     text = desktop.selection()
@@ -53,110 +58,19 @@ def _capture(cfg: config.Config) -> Invocation:
     return Invocation(text=text, target=target, desk=desk)
 
 
-def _deliver(action: str | None, text: str, inv: Invocation, cfg: config.Config) -> None:
+def deliver(action: str | None, text: str, inv: Invocation, cfg: config.Config) -> None:
     if not action or not text:
         return
     desktop.copy(text)
     if action == "copy":
-        _notify(cfg, "info", t("Copied."), timeout_ms=1500)
+        notify(cfg, "info", t("Copied."), timeout_ms=1500)
         return
     pasted = inv.target is not None and inv.desk.paste(inv.target, cfg.terminal_classes)
     if not pasted:
-        _notify(cfg, "warn", t("Copied: press Ctrl+V to paste."), timeout_ms=4000)
+        notify(cfg, "warn", t("Copied: press Ctrl+V to paste."), timeout_ms=4000)
 
 
-def _replace_in_place(cmd: config.Command, cfg: config.Config, inv: Invocation) -> int:
-    note = _notify(cfg, "info", f"{cmd.name}…", timeout_ms=60_000)
-    user = prompts.render(cmd.prompt, inv.text, cfg.context)
-    try:
-        result = providers.complete(cmd.model, prompts.command_system(cfg.glossary), user)
-    except providers.ProviderError as err:
-        _notify(cfg, "error", t("{name} failed: {err}", name=cmd.name, err=err), replaces=note)
-        return 1
-    if not result:
-        _notify(cfg, "warn", t("{name}: empty reply.", name=cmd.name), replaces=note)
-        return 1
-    if result == inv.text.strip():
-        _notify(cfg, "info", t("{name}: nothing to change.", name=cmd.name), replaces=note, timeout_ms=2000)
-        return 0
-    _notify(cfg, "info", t("{name}: done.", name=cmd.name), replaces=note, timeout_ms=1500)
-    _deliver("replace", result, inv, cfg)
-    return 0
-
-
-def _run(cmd: config.Command, cfg: config.Config, inv: Invocation, force_window: bool) -> int:
-    if not inv.text.strip():
-        _notify(cfg, "warn", t("{name}: select some text first.", name=cmd.name))
-        return 1
-    if cmd.output == "replace" and not force_window:
-        return _replace_in_place(cmd, cfg, inv)
-
-    from .ui import result
-
-    outcome = result.show(cmd.name, cmd.model, prompts.command_system(cfg.glossary),
-                          lambda text: prompts.render(cmd.prompt, text, cfg.context), inv.text,
-                          with_diff=cmd.diff)
-    _deliver(outcome.action, outcome.text, inv, cfg)
-    return 0
-
-
-def _translate(cfg: config.Config, inv: Invocation, contextual: bool = False) -> int:
-    from .ui import translate as window
-
-    outcome = window.show(cfg, inv.text, contextual)
-    _deliver(outcome.action, outcome.text, inv, cfg)
-    return 0
-
-
-def run_command(name: str, force_window: bool) -> int:
-    cfg = config.load()
-    cmd = cfg.commands.get(name)
-    if cmd is None:
-        print(f"unknown command '{name}'. Try: ai-toolbox list", file=sys.stderr)
-        return 2
-    return _run(cmd, cfg, _capture(cfg), force_window)
-
-
-def translate(use_selection: bool, contextual: bool = False) -> int:
-    cfg = config.load()
-    if use_selection:
-        inv = _capture(cfg)
-    else:
-        desk = desktop.detect()
-        inv = Invocation("", desk.focused(), desk)
-    return _translate(cfg, inv, contextual)
-
-
-def palette() -> int:
-    cfg = config.load()
-    inv = _capture(cfg)
-
-    from .ui import palette as window
-
-    choice = window.show(cfg, inv.text)
-    if choice is None:
-        return 0
-    if choice == TRANSLATE:
-        return _translate(cfg, inv)
-    if choice == SETTINGS:
-        return settings()
-    return _run(cfg.commands[choice], cfg, inv, force_window=False)
-
-
-def settings() -> int:
-    from .ui import settings as window
-
-    return window.show()
-
-
-def list_commands() -> int:
-    cfg = config.load()
-    for cmd in cfg.commands.values():
-        print(f"{cmd.id:<20} {cmd.output:<8} {cmd.model.provider}/{cmd.model.model:<14} {cmd.name}")
-    return 0
-
-
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ai-toolbox", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="action")
@@ -166,22 +80,68 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("translate")
     p.add_argument("--empty", action="store_true", help="ignore the current selection")
     p.add_argument("--context", action="store_true", help="start with translation with context on")
-    sub.add_parser("list")
-    sub.add_parser("palette")
-    sub.add_parser("settings")
-    args = parser.parse_args(argv)
+    for action in ("list", "palette", "settings", "daemon"):
+        sub.add_parser(action)
+    return parser
 
+
+def list_commands() -> int:
     try:
-        if args.action in ("run", "window"):
-            return run_command(args.command, force_window=args.action == "window")
-        if args.action == "translate":
-            return translate(use_selection=not args.empty, contextual=args.context)
-        if args.action == "list":
-            return list_commands()
-        if args.action == "settings":
-            return settings()
-        return palette()
+        cfg = config.load()
     except config.ConfigError as err:
-        desktop.notify(f"Config: {err}", urgency="critical")
         print(f"ai-toolbox: {err}", file=sys.stderr)
         return 2
+    for cmd in cfg.commands.values():
+        print(f"{cmd.id:<20} {cmd.output:<8} {cmd.model.provider}/{cmd.model.model:<14} {cmd.name}")
+    return 0
+
+
+def forward(argv: list[str]) -> bool:
+    """Hand the call to a running instance through its 'cmdline' action using
+    the gdbus binary: a few ms, versus ~100 ms to load GObject here."""
+    gdbus = shutil.which("gdbus")
+    if not gdbus:
+        return False
+    items = ", ".join("'" + a.replace("\\", "\\\\").replace("'", "\\'") + "'" for a in argv)
+    result = subprocess.run(
+        [gdbus, "call", "--session", "--dest", APP_ID, "--object-path", OBJECT_PATH,
+         "--method", "org.freedesktop.Application.ActivateAction",
+         "cmdline", f"[<@as [{items}]>]", "{}"],
+        capture_output=True, timeout=5)
+    return result.returncode == 0
+
+
+def _primary_running() -> bool:
+    """Is another ai-toolbox (daemon or open window) already on the session bus?"""
+    from gi.repository import Gio, GLib
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+        reply = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus",
+                              "org.freedesktop.DBus", "NameHasOwner",
+                              GLib.Variant("(s)", (APP_ID,)), GLib.VariantType("(b)"),
+                              Gio.DBusCallFlags.NONE, 500, None)
+        return reply.unpack()[0]
+    except GLib.Error:
+        return False
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(argv)  # validate (and --help) locally
+    if args.action == "list":
+        return list_commands()
+    if args.action != "daemon" and forward(argv):
+        return 0
+
+    if _primary_running():
+        # Hand the call to the running instance: Gio only, no GTK startup.
+        from gi.repository import Gio
+
+        remote = Gio.Application(application_id=APP_ID,
+                                 flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        return remote.run(["ai-toolbox", *argv])
+
+    from .app import run
+
+    return run(["ai-toolbox", *argv])

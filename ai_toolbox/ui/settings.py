@@ -311,5 +311,9 @@ class Settings:
         return page
 
 
+def open_window(app: Adw.Application) -> Adw.ApplicationWindow:
+    return Settings(app).win
+
+
 def show() -> int:
-    return run_window(lambda app: Settings(app).win)
+    return run_window(open_window)

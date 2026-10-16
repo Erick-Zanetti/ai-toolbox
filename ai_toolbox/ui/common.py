@@ -10,7 +10,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..editing import word_diff  # noqa: E402
 
-APP_ID = "dev.aitoolbox.AiToolbox"
+from ..cli import APP_ID  # noqa: E402,F401  (one source of truth)
 
 CSS = """
 .atb-text { font-size: 15px; background: transparent; }
@@ -35,6 +35,7 @@ CSS = """
 .atb-chip { border-radius: 12px; padding: 8px 12px; background: alpha(@view_fg_color, 0.05);
             border: 1px solid alpha(@view_fg_color, 0.06); }
 .atb-action { padding-left: 16px; padding-right: 16px; border-radius: 10px; font-weight: 700; }
+.atb-ask { min-height: 38px; border-radius: 10px; }
 .atb-lang > button { border-radius: 999px; padding-left: 14px; padding-right: 10px; }
 .atb-tile > image { color: @accent_color; -gtk-icon-style: symbolic; }
 @keyframes atb-pulse { from { opacity: 0.35; } to { opacity: 0.95; } }
