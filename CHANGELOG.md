@@ -15,6 +15,7 @@ All notable changes to this project. Dates are YYYY-MM-DD.
 - `{language}` placeholder and per-command `diff = false`.
 - Pasting on GNOME and KDE through the RemoteDesktop portal (asks once).
 - CI: lint and tests on GitHub Actions.
+- AUR-ready `ai-toolbox-git` package (PKGBUILD + .SRCINFO, builds clean).
 
 ## 0.1.0 — 2026-10-15
 
