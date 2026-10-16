@@ -198,5 +198,6 @@ def open_window(app: Adw.Application, title: str, model: Model, system: str,
 def show(title: str, model: Model, system: str, render: Callable[[str], str],
          original: str, with_diff: bool = True) -> Outcome:
     box: dict = {}
-    run_window(lambda app: open_window(app, title, model, system, render, original, with_diff, lambda value: box.setdefault("v", value)))
+    run_window(lambda app: open_window(app, title, model, system, render, original, with_diff,
+                                       lambda value: box.setdefault("v", value)))
     return box.get("v")

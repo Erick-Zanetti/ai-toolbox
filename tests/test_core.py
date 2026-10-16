@@ -66,7 +66,8 @@ def test_bad_output_is_rejected(tmp_path):
 def test_claude_stream_parser_yields_text_deltas():
     lines = [
         '{"type":"system"}',
-        '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi "}}}',
+        '{"type":"stream_event","event":{"type":"content_block_delta",'
+        '"delta":{"type":"text_delta","text":"Hi "}}}',
         '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"there"}}}',
         '{"type":"result","is_error":false}',
     ]
@@ -311,7 +312,8 @@ def test_glossary_reaches_command_and_translation_prompts(tmp_path):
 
 def test_language_placeholder_uses_system_language(monkeypatch):
     monkeypatch.setattr(prompts, "language_name", lambda: "Brazilian Portuguese")
-    assert prompts.render("Explain in {language}: {selection}", "x", "") == "Explain in Brazilian Portuguese: x"
+    out = prompts.render("Explain in {language}: {selection}", "x", "")
+    assert out == "Explain in Brazilian Portuguese: x"
 
 
 def test_explain_command_has_no_diff():

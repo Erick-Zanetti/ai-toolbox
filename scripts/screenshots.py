@@ -36,9 +36,12 @@ def grab(name):
 def _grab(name):
     for c in json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout):
         if c["class"] == "dev.aitoolbox.AiToolbox":
-            x, y = c["at"]; w, h = c["size"]
-            subprocess.run(["grim", "-g", f"{x+BORDER},{y+BORDER} {w-2*BORDER}x{h-2*BORDER}", f"{OUT}/{name}.png"])
-            subprocess.run(["hyprctl", "dispatch", f'hl.dsp.window.close({{ window = "address:{c["address"]}" }})'], capture_output=True)
+            x, y = c["at"]
+            w, h = c["size"]
+            geometry = f"{x + BORDER},{y + BORDER} {w - 2 * BORDER}x{h - 2 * BORDER}"
+            subprocess.run(["grim", "-g", geometry, f"{OUT}/{name}.png"], check=False)
+            close = f'hl.dsp.window.close({{ window = "address:{c["address"]}" }})'
+            subprocess.run(["hyprctl", "dispatch", close], capture_output=True, check=False)
 
 cfg = config.load()
 if SHOT == "palette":
@@ -54,7 +57,8 @@ elif SHOT in ("result", "result-light"):
 elif SHOT == "translate":
     from ai_toolbox.ui import translate
     capture("translate", 14000)
-    translate.show(cfg, "Galera, esse bug do login tá me tirando do sério, mas hoje eu mato ele de vez.", contextual=True)
+    translate.show(cfg, "Galera, esse bug do login tá me tirando do sério, mas hoje eu mato ele de vez.",
+                   contextual=True)
 elif SHOT == "settings":
     from ai_toolbox.ui.common import run_window
     from ai_toolbox.ui.settings import Settings

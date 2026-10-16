@@ -98,7 +98,8 @@ def open_window(app: Adw.Application, cfg: Config, text: str, contextual: bool,
         def refresh_info() -> None:
             words = len(buffer_text(src_view).split())
             detected = state["detected"]
-            parts = [t("Detected: {lang}", lang=detected)] if detected and source_dd.get_selected() == 0 else []
+            auto = detected and source_dd.get_selected() == 0
+            parts = [t("Detected: {lang}", lang=detected)] if auto else []
             parts.append(t("{n} word" if words == 1 else "{n} words", n=words))
             info.set_label("  ·  ".join(parts))
             m = model()

@@ -25,3 +25,14 @@ include = ["ai_toolbox*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Translation tables and D-Bus XML read better on one line.
+"ai_toolbox/i18n.py" = ["E501"]
+"tests/portal_mock.py" = ["E501"]

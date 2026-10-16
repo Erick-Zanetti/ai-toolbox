@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System packages (PyGObject, D-Bus)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-gi dbus
+
+      - name: Lint
+        run: pipx run ruff check ai_toolbox tests scripts
+
+      - name: Tests
+        run: |
+          python3 -m venv --system-site-packages .venv
+          .venv/bin/pip install --quiet pytest
+          .venv/bin/python -m pytest -q
