@@ -57,10 +57,15 @@ color and custom GTK color schemes (e.g. matugen/wallust themes).
 |---|---|---|
 | Hyprland | native IPC | native (no extra tools) |
 | Sway, niri | native IPC | `wtype` or `ydotool` |
-| KDE, GNOME, others | — | `ydotool` (focus returns to the app on its own) |
+| KDE, GNOME | — | RemoteDesktop portal (asks once, then remembered), or `ydotool` |
+| Others | — | `ydotool` |
 
-Without a way to send keys the result stays on the clipboard and a
-notification tells you to press Ctrl+V.
+Without a window-tracking IPC, focus simply returns to the app when the
+window closes. Without a way to send keys the result stays on the clipboard
+and a notification tells you to press Ctrl+V.
+
+> The portal path is tested against a fake portal on a private D-Bus
+> (`tests/test_portal.py`), not yet on a real GNOME/KDE session. Reports welcome.
 
 Text comes from the primary selection: just highlight it. For apps without
 one, `copy_fallback = true` sends them a Ctrl+C instead (never to terminals).
@@ -170,7 +175,8 @@ answer is not a new version of the text (like Explain). Without `{selection}` th
 ## Development
 
 ```sh
-uv run --no-project --with pytest python -m pytest
+uv run --no-project --with pytest python -m pytest     # core tests
+# GTK/D-Bus tests need PyGObject: run with a venv using --system-site-packages
 ```
 
 Adding a UI language: add a table to [`ai_toolbox/i18n.py`](ai_toolbox/i18n.py).

@@ -321,3 +321,30 @@ def test_explain_command_has_no_diff():
 
 def test_refine_wraps_text_after_instruction():
     assert prompts.refine("  more formal ", "hey") == "more formal\n\n<text>\nhey\n</text>"
+
+
+def test_portal_shortcut_events_press_and_release_in_order():
+    from ai_toolbox import portal
+
+    ctrl, shift, v = portal.KEYSYMS["ctrl"], portal.KEYSYMS["shift"], portal.KEYSYMS["v"]
+    assert portal.shortcut_events("v", False) == [(ctrl, 1), (v, 1), (v, 0), (ctrl, 0)]
+    assert portal.shortcut_events("v", True) == [
+        (ctrl, 1), (shift, 1), (v, 1), (v, 0), (shift, 0), (ctrl, 0)]
+
+
+def test_portal_unavailable_without_gi_returns_false(monkeypatch):
+    import builtins
+
+    from ai_toolbox import portal
+
+    real_import = builtins.__import__
+
+    def no_gi(name, *args, **kwargs):
+        if name.startswith("gi"):
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_gi)
+    monkeypatch.setattr(portal, "_instance", None)
+    monkeypatch.setattr(portal, "_available", None)
+    assert portal.send_shortcut("v", False) is False

@@ -48,11 +48,16 @@ _KEYCODES = {"c": 46, "v": 47}
 
 
 def _inject_shortcut(key: str, terminal: bool) -> bool:
-    """Ctrl+<key> (Ctrl+Shift+<key> in terminals) through wtype or ydotool."""
+    """Ctrl+<key> (Ctrl+Shift+<key> in terminals): wtype (wlroots), then the
+    RemoteDesktop portal (GNOME, KDE), then ydotool (anywhere, needs ydotoold)."""
     if shutil.which("wtype"):
         mods = ["-M", "ctrl"] + (["-M", "shift"] if terminal else [])
         if _run(["wtype", *mods, "-k", key]).returncode == 0:
             return True
+    from . import portal
+
+    if portal.send_shortcut(key, terminal):
+        return True
     if shutil.which("ydotool"):
         code = _KEYCODES[key]
         keys = ["29:1"] + (["42:1"] if terminal else []) + [f"{code}:1", f"{code}:0"]
