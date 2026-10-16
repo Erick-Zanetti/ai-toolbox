@@ -49,6 +49,7 @@ class Command:
     prompt: str
     output: str
     model: Model
+    diff: bool = True  # highlight changes in the result window
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class Config:
     terminal_classes: tuple[str, ...]
     copy_fallback: bool = False
     notifications: str = "all"  # all | errors | off
+    glossary: tuple[str, ...] = ()  # terms the AI must never change
     commands: dict[str, Command] = field(default_factory=dict)
 
 
@@ -116,6 +118,7 @@ def _command(path: Path, default: Model, providers: dict) -> Command:
         prompt=raw["prompt"],
         output=output,
         model=_model(raw, default, providers),
+        diff=bool(raw.get("diff", True)),
     )
 
 
@@ -172,5 +175,6 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
         terminal_classes=tuple(raw.get("terminal_classes", ())),
         copy_fallback=bool(raw.get("copy_fallback", False)),
         notifications=notifications,
+        glossary=tuple(str(term) for term in raw.get("glossary", ()) if str(term).strip()),
         commands=commands,
     )

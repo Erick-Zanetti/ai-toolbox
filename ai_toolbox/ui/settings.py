@@ -135,6 +135,15 @@ class Settings:
         behavior.add(fallback)
         page.add(behavior)
 
+        words = Adw.PreferencesGroup(
+            title=t("Personal dictionary"),
+            description=t("Product names, acronyms and jargon that commands and "
+                          "translations must never change."))
+        words.add(_entry(t("Terms (comma separated)"), ", ".join(self.data.get("glossary", [])),
+                         lambda v: self._set(self.data, "glossary",
+                                             [x.strip() for x in v.split(",") if x.strip()] or None)))
+        page.add(words)
+
         accounts = Adw.PreferencesGroup(
             title=t("AI accounts"),
             description=t("claude and codex use your logged-in CLIs; openai is any "

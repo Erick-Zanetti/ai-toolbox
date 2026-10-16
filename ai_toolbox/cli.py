@@ -69,7 +69,7 @@ def _replace_in_place(cmd: config.Command, cfg: config.Config, inv: Invocation) 
     note = _notify(cfg, "info", f"{cmd.name}…", timeout_ms=60_000)
     user = prompts.render(cmd.prompt, inv.text, cfg.context)
     try:
-        result = providers.complete(cmd.model, prompts.COMMAND_SYSTEM, user)
+        result = providers.complete(cmd.model, prompts.command_system(cfg.glossary), user)
     except providers.ProviderError as err:
         _notify(cfg, "error", t("{name} failed: {err}", name=cmd.name, err=err), replaces=note)
         return 1
@@ -93,8 +93,9 @@ def _run(cmd: config.Command, cfg: config.Config, inv: Invocation, force_window:
 
     from .ui import result
 
-    outcome = result.show(cmd.name, cmd.model, prompts.COMMAND_SYSTEM,
-                          lambda text: prompts.render(cmd.prompt, text, cfg.context), inv.text)
+    outcome = result.show(cmd.name, cmd.model, prompts.command_system(cfg.glossary),
+                          lambda text: prompts.render(cmd.prompt, text, cfg.context), inv.text,
+                          with_diff=cmd.diff)
     _deliver(outcome.action, outcome.text, inv, cfg)
     return 0
 

@@ -1,0 +1,12 @@
+name = "Shorten"
+icon = "format-justify-left-symbolic"
+output = "window"
+prompt = """
+Make the text shorter and more direct. Remove filler, repetition and hedging;
+keep every important fact, the tone and the language. Aim for about half the
+length when possible.
+
+<text>
+{selection}
+</text>
+"""

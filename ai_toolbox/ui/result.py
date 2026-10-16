@@ -36,7 +36,7 @@ def _pane(title: str, scroller: Gtk.Widget, pill: Gtk.Label) -> Gtk.Box:
 
 
 def show(title: str, model: Model, system: str, render: Callable[[str], str],
-         original: str) -> Outcome:
+         original: str, with_diff: bool = True) -> Outcome:
     """`render(text)` builds the user prompt for a given input text."""
     outcome = Outcome()
 
@@ -87,6 +87,8 @@ def show(title: str, model: Model, system: str, render: Callable[[str], str],
             (status.add_css_class if thinking else status.remove_css_class)("atb-thinking")
 
         def diff() -> None:
+            if not with_diff:
+                return
             removed, added = show_diff(in_view, out_view)
             removed_pill.set_label(f"−{removed}")
             added_pill.set_label(f"+{added}")

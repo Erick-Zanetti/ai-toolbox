@@ -13,6 +13,10 @@ default_provider = "claude"
 # Never sent to the terminals below.
 copy_fallback = false
 
+# Personal dictionary: product names, acronyms, jargon. Never translated,
+# corrected or recapitalized by any command or translation.
+glossary = []
+
 # Window classes that paste with Ctrl+Shift+V.
 terminal_classes = ["foot", "org.codeberg.dnkl.foot", "kitty", "Alacritty", "com.mitchellh.ghostty", "org.wezfurlong.wezterm"]
 

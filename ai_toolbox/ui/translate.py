@@ -135,7 +135,7 @@ def show(cfg: Config, text: str, contextual: bool = False) -> Outcome:
                 return False
             system = prompts.translate_system(
                 selected(source_dd, sources), selected(target_dd, targets), tr.pair,
-                cfg.context if context_toggle.get_active() else None)
+                cfg.context if context_toggle.get_active() else None, cfg.glossary)
             spinner.set_visible(True)
             try:
                 state["run"] = providers.stream_in_thread(

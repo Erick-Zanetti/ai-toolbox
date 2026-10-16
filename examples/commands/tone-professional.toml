@@ -1,0 +1,15 @@
+name = "Make it professional"
+icon = "emblem-documents-symbolic"
+output = "window"
+prompt = """
+Rewrite the text in a professional, polished tone suitable for email or a work
+chat with managers or clients. Keep the meaning, facts and language. Stay
+concise; do not add greetings or sign-offs that are not there.
+
+About the writer:
+{context}
+
+<text>
+{selection}
+</text>
+"""

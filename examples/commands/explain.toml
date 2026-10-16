@@ -1,0 +1,16 @@
+name = "Explain"
+icon = "help-about-symbolic"
+output = "window"
+# The answer is not a new version of the text: no change highlighting.
+diff = false
+model = "sonnet"
+prompt = """
+Explain the text below in {language}, simply and briefly. It may be an error
+message, a log, code or a dense paragraph. Say what it means, the likely cause
+if it is an error, and what to do next. Use short paragraphs or bullets; plain
+text, no markdown headings.
+
+<text>
+{selection}
+</text>
+"""

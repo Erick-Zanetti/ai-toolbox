@@ -1,0 +1,15 @@
+name = "Make it casual"
+icon = "face-smile-symbolic"
+output = "window"
+prompt = """
+Rewrite the text in a relaxed, friendly tone, like a message to teammates on
+Slack. Keep the meaning and language. Natural, not slangy; no emojis unless the
+text already has them.
+
+About the writer:
+{context}
+
+<text>
+{selection}
+</text>
+"""

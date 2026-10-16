@@ -297,3 +297,23 @@ def test_bad_notifications_value_is_rejected(tmp_path):
     (tmp_path / "config.toml").write_text('notifications = "loud"\n[providers.claude]\nmodel = "haiku"\n')
     with pytest.raises(config.ConfigError):
         config.load(tmp_path)
+
+
+def test_glossary_reaches_command_and_translation_prompts(tmp_path):
+    (tmp_path / "config.toml").write_text(
+        'glossary = ["Titan", "FMP"]\n[providers.claude]\nmodel = "haiku"\n')
+    cfg = config.load(tmp_path)
+    assert cfg.glossary == ("Titan", "FMP")
+    assert '"Titan", "FMP"' in prompts.command_system(cfg.glossary)
+    assert '"Titan"' in prompts.translate_system(None, None, ("English", "Portuguese"), None, cfg.glossary)
+    assert prompts.command_system(()) == prompts.COMMAND_SYSTEM
+
+
+def test_language_placeholder_uses_system_language(monkeypatch):
+    monkeypatch.setattr(prompts, "language_name", lambda: "Brazilian Portuguese")
+    assert prompts.render("Explain in {language}: {selection}", "x", "") == "Explain in Brazilian Portuguese: x"
+
+
+def test_explain_command_has_no_diff():
+    assert config.load(EXAMPLES).commands["explain"].diff is False
+    assert config.load(EXAMPLES).commands["shorten"].diff is True
