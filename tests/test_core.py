@@ -356,9 +356,10 @@ def test_dictation_settings_load_and_validate(tmp_path):
     (tmp_path / "config.toml").write_text(
         '[providers.claude]\nmodel = "haiku"\n[dictation]\nlanguage = "pt"\nthen = "fix-spelling"\n')
     settings = config.load(tmp_path).dictation
-    assert (settings.language, settings.then, settings.model) == ("pt", "fix-spelling", "large-v3-turbo")
     expected = ("pt", "fix-spelling", "large-v3-turbo")
     assert (settings.language, settings.then, settings.model) == expected
+    (tmp_path / "config.toml").write_text(
+        '[providers.claude]\nmodel = "haiku"\n[dictation]\ndevice = "tpu"\n')
     with pytest.raises(config.ConfigError):
         config.load(tmp_path)
     (tmp_path / "config.toml").write_text('[providers.claude]\nmodel = "haiku"\n[dictation]\nmodle = "x"\n')
