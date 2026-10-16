@@ -35,6 +35,8 @@ def show(cfg: Config, selection: str) -> str | None:
             kind = t("Replaces the selection") if cmd.output == "replace" else t("Shows the result")
             listbox.append(_row(cmd.id, cmd.name, f"{kind}  ·  {cmd.model.provider} · {cmd.model.model}",
                                 cmd.icon))
+        listbox.append(_row("settings", t("Settings"), t("Commands, notifications, models"),
+                            "preferences-system-symbolic"))
         scroller = Gtk.ScrolledWindow(child=listbox, vexpand=True,
                                       hscrollbar_policy=Gtk.PolicyType.NEVER)
 

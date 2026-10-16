@@ -18,6 +18,7 @@ EXAMPLES_DIRS = (
 
 OUTPUTS = ("replace", "window")
 KINDS = ("claude", "codex", "openai")
+NOTIFICATIONS = ("all", "errors", "off")
 
 
 class ConfigError(Exception):
@@ -65,6 +66,7 @@ class Config:
     context: str
     terminal_classes: tuple[str, ...]
     copy_fallback: bool = False
+    notifications: str = "all"  # all | errors | off
     commands: dict[str, Command] = field(default_factory=dict)
 
 
@@ -138,6 +140,10 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
     default_name = raw.get("default_provider", next(iter(providers)))
     default = _model({"provider": default_name}, Model(default_name, ""), providers)
 
+    notifications = raw.get("notifications", "all")
+    if notifications not in NOTIFICATIONS:
+        raise ConfigError(f"notifications must be one of {NOTIFICATIONS}")
+
     tr = raw.get("translate", {})
     pair = tuple(tr.get("pair", ("English", "Portuguese (Brazil)")))
     if len(pair) != 2:
@@ -165,5 +171,6 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
         context=context,
         terminal_classes=tuple(raw.get("terminal_classes", ())),
         copy_fallback=bool(raw.get("copy_fallback", False)),
+        notifications=notifications,
         commands=commands,
     )

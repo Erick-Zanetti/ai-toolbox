@@ -9,8 +9,12 @@ Terminal=false
 Categories=Utility;TextTools;
 Keywords=ai;grammar;spelling;translate;rewrite;raycast;
 StartupNotify=false
-Actions=translate;
+Actions=translate;settings;
 
 [Desktop Action translate]
 Name=Translate
 Exec=ai-toolbox translate --empty
+
+[Desktop Action settings]
+Name=Settings
+Exec=ai-toolbox settings

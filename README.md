@@ -88,6 +88,7 @@ ai-toolbox run <command>      run on the selection (output from the command file
 ai-toolbox window <command>   same, always showing the result window
 ai-toolbox translate          translator, prefilled with the selection (--empty to skip)
 ai-toolbox list               list commands
+ai-toolbox settings           settings window
 ```
 
 | Window | Keys |
@@ -97,8 +98,19 @@ ai-toolbox list               list commands
 
 ## Configuration
 
-`~/.config/ai-toolbox/config.toml` holds the providers, the translator
-languages and models; see [`examples/config.toml`](examples/config.toml).
+`ai-toolbox settings` (also in the palette) edits everything and saves as you go:
+
+- **General**: notifications (all, errors only, off), copy fallback, default
+  provider, models, local models (Ollama).
+- **Commands**: create, edit and delete commands. Per command, choose **Show a
+  window** (review and edit, Ctrl+Enter to replace) or **Replace directly**
+  (no window, progress in notifications).
+- **Translate**: language pair, extra languages, models for literal and
+  contextual translation.
+- **Context**: `context.md`, who you are and how you write.
+
+The files live in `~/.config/ai-toolbox/` (`config.toml`, `commands/*.toml`,
+`context.md`) and are fine to edit by hand; see [`examples`](examples).
 
 ### Adding a command
 

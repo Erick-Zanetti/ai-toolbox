@@ -5,6 +5,7 @@
   ai-toolbox window <command>    same, but always show the result window
   ai-toolbox translate           translator window, prefilled with the selection
   ai-toolbox list                list commands
+  ai-toolbox settings            settings window
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from . import config, desktop, prompts, providers
 from .i18n import t
 
 TRANSLATE = "translate"
+SETTINGS = "settings"
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,17 @@ class Invocation:
     text: str
     target: desktop.Target | None
     desk: desktop.Desktop
+
+
+def _notify(cfg: config.Config, level: str, body: str, **kw) -> int | None:
+    """level: info (progress, done), warn (needs the user), error."""
+    if cfg.notifications == "off" or (cfg.notifications == "errors" and level == "info"):
+        return None
+    if level == "error":
+        kw.setdefault("urgency", "critical")
+    elif level == "warn":
+        kw.setdefault("urgency", "normal")
+    return desktop.notify(body, **kw)
 
 
 def _capture(cfg: config.Config) -> Invocation:
@@ -45,36 +58,35 @@ def _deliver(action: str | None, text: str, inv: Invocation, cfg: config.Config)
         return
     desktop.copy(text)
     if action == "copy":
-        desktop.notify(t("Copied."), timeout_ms=1500)
+        _notify(cfg, "info", t("Copied."), timeout_ms=1500)
         return
     pasted = inv.target is not None and inv.desk.paste(inv.target, cfg.terminal_classes)
     if not pasted:
-        desktop.notify(t("Copied: press Ctrl+V to paste."), urgency="normal", timeout_ms=4000)
+        _notify(cfg, "warn", t("Copied: press Ctrl+V to paste."), timeout_ms=4000)
 
 
 def _replace_in_place(cmd: config.Command, cfg: config.Config, inv: Invocation) -> int:
-    note = desktop.notify(f"{cmd.name}…", timeout_ms=60_000)
+    note = _notify(cfg, "info", f"{cmd.name}…", timeout_ms=60_000)
     user = prompts.render(cmd.prompt, inv.text, cfg.context)
     try:
         result = providers.complete(cmd.model, prompts.COMMAND_SYSTEM, user)
     except providers.ProviderError as err:
-        desktop.notify(t("{name} failed: {err}", name=cmd.name, err=err),
-                       replaces=note, urgency="critical")
+        _notify(cfg, "error", t("{name} failed: {err}", name=cmd.name, err=err), replaces=note)
         return 1
     if not result:
-        desktop.notify(t("{name}: empty reply.", name=cmd.name), replaces=note, urgency="normal")
+        _notify(cfg, "warn", t("{name}: empty reply.", name=cmd.name), replaces=note)
         return 1
     if result == inv.text.strip():
-        desktop.notify(t("{name}: nothing to change.", name=cmd.name), replaces=note, timeout_ms=2000)
+        _notify(cfg, "info", t("{name}: nothing to change.", name=cmd.name), replaces=note, timeout_ms=2000)
         return 0
-    desktop.notify(t("{name}: done.", name=cmd.name), replaces=note, timeout_ms=1500)
+    _notify(cfg, "info", t("{name}: done.", name=cmd.name), replaces=note, timeout_ms=1500)
     _deliver("replace", result, inv, cfg)
     return 0
 
 
 def _run(cmd: config.Command, cfg: config.Config, inv: Invocation, force_window: bool) -> int:
     if not inv.text.strip():
-        desktop.notify(t("{name}: select some text first.", name=cmd.name), urgency="normal")
+        _notify(cfg, "warn", t("{name}: select some text first.", name=cmd.name))
         return 1
     if cmd.output == "replace" and not force_window:
         return _replace_in_place(cmd, cfg, inv)
@@ -125,7 +137,15 @@ def palette() -> int:
         return 0
     if choice == TRANSLATE:
         return _translate(cfg, inv)
+    if choice == SETTINGS:
+        return settings()
     return _run(cfg.commands[choice], cfg, inv, force_window=False)
+
+
+def settings() -> int:
+    from .ui import settings as window
+
+    return window.show()
 
 
 def list_commands() -> int:
@@ -146,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--empty", action="store_true", help="ignore the current selection")
     sub.add_parser("list")
     sub.add_parser("palette")
+    sub.add_parser("settings")
     args = parser.parse_args(argv)
 
     try:
@@ -155,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
             return translate(use_selection=not args.empty)
         if args.action == "list":
             return list_commands()
+        if args.action == "settings":
+            return settings()
         return palette()
     except config.ConfigError as err:
         desktop.notify(f"Config: {err}", urgency="critical")

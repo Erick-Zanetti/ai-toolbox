@@ -234,3 +234,66 @@ def test_word_diff_marks_removed_and_added_spans():
     removed, added = word_diff(before, after)
     assert [before[a:b] for a, b in removed] == ["goes"]
     assert [after[a:b] for a, b in added] == ["went", "the "]
+
+
+def test_store_round_trips_config_and_commands(tmp_path):
+    import shutil
+
+    from ai_toolbox.store import Store
+
+    shutil.copytree(EXAMPLES, tmp_path, dirs_exist_ok=True)
+    store = Store(tmp_path)
+    data = store.config()
+    data["notifications"] = "errors"
+    store.save_config(data)
+    assert store.config() == data
+
+    cmd = store.commands()["fix-spelling"]
+    cmd["output"] = "replace"
+    store.save_command("fix-spelling", cmd)
+    assert store.commands()["fix-spelling"] == cmd
+
+    new_id = store.new_command_id("Make it Friendlier!")
+    assert new_id == "make-it-friendlier"
+    store.save_command(new_id, {"name": "x", "prompt": "a 'quoted' \"text\"\nline2"})
+    loaded = config.load(tmp_path)
+    assert loaded.notifications == "errors"
+    assert loaded.commands[new_id].prompt == "a 'quoted' \"text\"\nline2"
+    store.delete_command(new_id)
+    assert new_id not in store.commands()
+
+
+def test_store_writes_through_symlinks(tmp_path):
+    from ai_toolbox.store import Store
+
+    real = tmp_path / "dotfiles.toml"
+    real.write_text('[providers.claude]\nmodel = "haiku"\n')
+    (tmp_path / "cfg").mkdir()
+    (tmp_path / "cfg" / "config.toml").symlink_to(real)
+    store = Store(tmp_path / "cfg")
+    data = store.config()
+    data["copy_fallback"] = True
+    store.save_config(data)
+    assert (tmp_path / "cfg" / "config.toml").is_symlink()
+    assert "copy_fallback = true" in real.read_text()
+
+
+def test_notification_levels(monkeypatch):
+    import dataclasses
+
+    from ai_toolbox import cli, desktop
+
+    sent = []
+    monkeypatch.setattr(desktop, "notify", lambda body, **kw: sent.append(body))
+    cfg = config.load(EXAMPLES)
+    for level in ("all", "errors", "off"):
+        c = dataclasses.replace(cfg, notifications=level)
+        for kind in ("info", "warn", "error"):
+            cli._notify(c, kind, f"{level}-{kind}")
+    assert sent == ["all-info", "all-warn", "all-error", "errors-warn", "errors-error"]
+
+
+def test_bad_notifications_value_is_rejected(tmp_path):
+    (tmp_path / "config.toml").write_text('notifications = "loud"\n[providers.claude]\nmodel = "haiku"\n')
+    with pytest.raises(config.ConfigError):
+        config.load(tmp_path)

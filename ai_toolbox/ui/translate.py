@@ -39,10 +39,13 @@ def show(cfg: Config, text: str) -> Outcome:
         langs = Gtk.Box(spacing=6)
         for widget in (source_dd, swap, target_dd):
             langs.append(widget)
-        context_toggle = Gtk.ToggleButton(label=t("With context"), tooltip_text="Ctrl+I")
+        context_toggle = Gtk.Switch(valign=Gtk.Align.CENTER, tooltip_text="Ctrl+I")
+        context_box = Gtk.Box(spacing=8)
+        context_box.append(Gtk.Label(label=t("With context")))
+        context_box.append(context_toggle)
         spinner = Adw.Spinner(visible=False)
         header = Adw.HeaderBar(title_widget=langs)
-        header.pack_end(context_toggle)
+        header.pack_end(context_box)
         header.pack_end(spinner)
 
         src_scroll, src_view = text_view(editable=True)
@@ -162,7 +165,7 @@ def show(cfg: Config, text: str) -> Outcome:
         src_view.get_buffer().connect("changed", schedule)
         source_dd.connect("notify::selected", schedule)
         target_dd.connect("notify::selected", schedule)
-        context_toggle.connect("toggled", lambda *_: translate_now())
+        context_toggle.connect("notify::active", lambda *_: translate_now())
         swap.connect("clicked", lambda *_: swap_languages())
 
         shortcut(win, "<Control>Return", lambda: finish("replace"))
