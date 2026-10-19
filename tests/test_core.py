@@ -403,3 +403,23 @@ def test_stt_worker_protocol_with_fake_model(tmp_path):
                           capture_output=True, env={"PYTHONPATH": str(fake)}, timeout=30)
     lines = [json.loads(line) for line in proc.stdout.splitlines()]
     assert lines == [{"ready": True, "device": "cpu"}, {"text": "olá mundo", "language": "pt"}]
+
+
+
+def test_selection_gives_up_when_the_owner_never_answers(monkeypatch, tmp_path):
+    """An app can own the selection and never send its data; reading it must not
+    hang the daemon."""
+    import time
+
+    from ai_toolbox import desktop
+
+    fake = tmp_path / "wl-paste"
+    fake.write_text("#!/bin/sh\nsleep 5\n")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin")
+    monkeypatch.setattr(desktop, "SELECTION_TIMEOUT_S", 0.2)
+
+    started = time.monotonic()
+    assert desktop.selection() == ""
+    assert desktop.clipboard() == ""
+    assert time.monotonic() - started < 2

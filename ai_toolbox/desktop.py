@@ -31,6 +31,8 @@ def _run(argv: list[str], **kw) -> subprocess.CompletedProcess:
         return subprocess.run(argv, text=True, capture_output=True, **kw)
     except FileNotFoundError:
         return subprocess.CompletedProcess(argv, 127, "", f"{argv[0]}: not found")
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(argv, 124, "", f"{argv[0]}: timed out")
 
 
 def _json(argv: list[str]):
@@ -170,14 +172,20 @@ def can_inject() -> bool:
 
 # ── Clipboard and notifications ────────────────────────────────────────────
 
+# The app that owns a selection sends its data on request; one that never does
+# would block wl-paste, and with it the whole app, forever.
+SELECTION_TIMEOUT_S = 2.0
+
 def selection() -> str:
     """Highlighted text (Wayland primary selection): no Ctrl+C needed."""
-    result = _run(["wl-paste", "--primary", "--no-newline", "--type", "text/plain"])
+    result = _run(["wl-paste", "--primary", "--no-newline", "--type", "text/plain"],
+                  timeout=SELECTION_TIMEOUT_S)
     return result.stdout if result.returncode == 0 else ""
 
 
 def clipboard() -> str:
-    result = _run(["wl-paste", "--no-newline", "--type", "text/plain"])
+    result = _run(["wl-paste", "--no-newline", "--type", "text/plain"],
+                  timeout=SELECTION_TIMEOUT_S)
     return result.stdout if result.returncode == 0 else ""
 
 
