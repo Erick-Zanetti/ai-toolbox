@@ -30,6 +30,7 @@ CSS = """
 .atb-stat { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .atb-stat-add { color: #2ec27e; background: alpha(#2ec27e, 0.15); }
 .atb-stat-del { color: #e66159; background: alpha(#e01b24, 0.15); }
+.atb-tone { color: @accent_color; background: alpha(@accent_bg_color, 0.18); }
 .atb-tile { border-radius: 10px; padding: 7px; background: alpha(@accent_bg_color, 0.18);
             color: @accent_color; }
 .atb-chip { border-radius: 12px; padding: 8px 12px; background: alpha(@view_fg_color, 0.05);
@@ -60,6 +61,18 @@ def text_view(editable: bool = True) -> tuple[Gtk.ScrolledWindow, Gtk.TextView]:
                                   hscrollbar_policy=Gtk.PolicyType.NEVER)
     scroller.add_css_class("atb-pane")
     return scroller, view
+
+
+def pane(title: str, scroller: Gtk.Widget, *pills: Gtk.Label) -> Gtk.Box:
+    """A text pane under a small uppercase title, with optional pills beside it."""
+    head = Gtk.Box(spacing=8)
+    head.append(Gtk.Label(label=title.upper(), xalign=0, css_classes=["atb-pane-title"]))
+    for pill in pills:
+        head.append(pill)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+    box.append(head)
+    box.append(scroller)
+    return box
 
 
 def buffer_text(view: Gtk.TextView) -> str:

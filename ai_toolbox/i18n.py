@@ -114,6 +114,14 @@ _PT = {
     "Detected: {lang}": "Detectado: {lang}",
     "{n} word": "{n} palavra",
     "{n} words": "{n} palavras",
+    "tone": "tom",
+    "alternatives": "alternativas",
+    "neutral": "neutro",
+    "casual": "casual",
+    "formal": "formal",
+    "friendly": "amigável",
+    "direct": "direto",
+    "No alternatives.": "Nenhuma alternativa.",
 }
 
 _TABLES = {"pt": _PT}

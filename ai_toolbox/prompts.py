@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from .desktop import clipboard
 from .i18n import language_name
 
@@ -32,6 +34,71 @@ def command_system(glossary: tuple[str, ...] = ()) -> str:
 def refine(instruction: str, text: str) -> str:
     """Follow-up typed in the result window: apply a free instruction to the text."""
     return f"{instruction.strip()}\n\n<text>\n{text}\n</text>"
+
+
+# ── Tone and alternatives (result and reply windows) ───────────────────────
+
+TONES = ("neutral", "casual", "formal", "friendly", "direct")
+_TONE_RULES = {
+    "casual": "Rewrite the text in a casual, relaxed tone, like a message to a colleague you know well.",
+    "formal": "Rewrite the text in a formal, professional tone.",
+    "friendly": "Rewrite the text in a warm, friendly tone.",
+    "direct": "Rewrite the text to be direct and concise: get to the point, drop filler and hedging.",
+}
+SEPARATOR = "---"
+
+
+def next_tone(current: str) -> str:
+    """Ctrl+T: neutral → casual → formal → friendly → direct → neutral."""
+    index = TONES.index(current) if current in TONES else 0
+    return TONES[(index + 1) % len(TONES)]
+
+
+def tone(name: str, text: str) -> str:
+    """Rewrite in a tone; neutral is the original output, never a request."""
+    if name not in _TONE_RULES:
+        raise ValueError(f"no rewrite for tone '{name}'")
+    return refine(f"{_TONE_RULES[name]} Keep the meaning, the language and the formatting.", text)
+
+
+def alternatives(text: str) -> str:
+    return refine(
+        "Write three alternative versions of the text, each worded differently, with the same "
+        f"meaning, language and tone. Separate the versions with a line containing only {SEPARATOR}. "
+        "Nothing else.", text)
+
+
+_MARKER = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_QUOTES = {'"': '"', "“": "”", "'": "'"}
+
+
+def _clean(option: str) -> str:
+    option = _MARKER.sub("", option.strip(), count=1).strip()
+    if len(option) > 1 and _QUOTES.get(option[0]) == option[-1]:
+        option = option[1:-1].strip()
+    return option
+
+
+def parse_suggestions(raw: str, limit: int = 3) -> list[str]:
+    """Model output → up to `limit` options: blocks between '---' lines when
+    there are any (multi-line versions), otherwise one option per line."""
+    lines = raw.strip().splitlines()
+    if any(line.strip() == SEPARATOR for line in lines):
+        blocks, current = [], []
+        for line in lines + [SEPARATOR]:
+            if line.strip() == SEPARATOR:
+                blocks.append("\n".join(current))
+                current = []
+            else:
+                current.append(line)
+    else:
+        blocks = lines
+    options = []
+    for block in blocks:
+        option = _clean(block)
+        if option and option not in options:
+            options.append(option)
+    return options[:limit]
 
 
 LANG_MARK = "@lang "
