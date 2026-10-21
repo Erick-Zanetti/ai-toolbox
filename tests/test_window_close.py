@@ -3,13 +3,16 @@
 import pytest
 
 gi = pytest.importorskip("gi")
-gi.require_version("Gtk", "4.0")
 
 
 @pytest.fixture
 def window():
     """A realized window: close() ignores one that was never realized. GTK starts
     here, not at import, so collecting this file does not touch other tests."""
+    try:
+        gi.require_version("Gtk", "4.0")
+    except ValueError:
+        pytest.skip("GTK 4 not installed")
     from gi.repository import Gtk
 
     if not Gtk.init_check():
