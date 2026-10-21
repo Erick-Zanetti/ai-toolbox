@@ -4,6 +4,7 @@
   ai-toolbox run <command>       run on the selected text (output from the command file)
   ai-toolbox window <command>    same, but always show the result window
   ai-toolbox translate           translator window, prefilled with the selection
+  ai-toolbox reply               write a reply to the selected message
   ai-toolbox settings            settings window
   ai-toolbox dictate             start/stop dictation (--then <command>, --cancel)
   ai-toolbox list                list commands
@@ -25,6 +26,7 @@ APP_ID = "dev.aitoolbox.AiToolbox"
 OBJECT_PATH = "/" + APP_ID.replace(".", "/")
 TRANSLATE = "translate"
 SETTINGS = "settings"
+REPLY = "reply"
 
 
 @dataclass(frozen=True)
@@ -84,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dictate")
     p.add_argument("--then", metavar="COMMAND", help="run a command on the transcript before pasting")
     p.add_argument("--cancel", action="store_true", help="stop without pasting")
-    for action in ("list", "palette", "settings", "daemon"):
+    for action in ("list", "palette", "reply", "settings", "daemon"):
         sub.add_parser(action)
     return parser
 

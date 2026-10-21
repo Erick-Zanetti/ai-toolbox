@@ -49,6 +49,23 @@ def test_parse_suggestions_skips_duplicates_and_blanks():
     assert prompts.parse_suggestions("") == []
 
 
+def test_reply_system_writes_as_the_user_in_the_received_language():
+    system = prompts.reply_system("I am Erick, a developer.", ("Titan",))
+    assert "I am Erick, a developer." in system
+    assert "language of the received message" in system
+    assert '"Titan"' in system
+    assert "about_the_user" not in prompts.reply_system("", ())
+
+
+def test_reply_prompts_carry_the_message_and_the_notes():
+    out = prompts.reply_prompt("Can you review my PR?", "  diz que vejo amanhã ")
+    assert "<received_message>\nCan you review my PR?\n</received_message>" in out
+    assert "<my_notes>\ndiz que vejo amanhã\n</my_notes>" in out
+    suggestions = prompts.reply_suggestions_prompt("Lunch?")
+    assert "<received_message>\nLunch?\n</received_message>" in suggestions
+    assert "three" in suggestions and "one per line" in suggestions.lower()
+
+
 def test_every_ui_string_has_a_portuguese_translation():
     import ast
     from pathlib import Path

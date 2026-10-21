@@ -122,6 +122,13 @@ _PT = {
     "friendly": "amigável",
     "direct": "direto",
     "No alternatives.": "Nenhuma alternativa.",
+    "Reply": "Responder",
+    "Write a reply to the selected message": "Escrever uma resposta para a mensagem selecionada",
+    "Received message": "Mensagem recebida",
+    "Your notes, in any language… empty: three suggestions": "Suas anotações, em qualquer idioma… vazio: três sugestões",
+    "Paste the message you received first.": "Cole primeiro a mensagem que você recebeu.",
+    "write": "escrever",
+    "copy": "copiar",
 }
 
 _TABLES = {"pt": _PT}

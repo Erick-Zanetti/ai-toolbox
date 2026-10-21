@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ..cli import REPLY, SETTINGS, TRANSLATE
 from ..config import Config
 from ..i18n import t
 from .common import Adw, Gtk, hint_bar, icon_tile, run_window, shortcut
 
-TRANSLATE = "translate"
-SETTINGS = "settings"
 PREVIEW_CHARS = 180
 KEYS = [("↑↓", "navigate"), ("Enter", "run"), ("Esc", "close")]
 
@@ -52,6 +51,8 @@ def open_window(app: Adw.Application, cfg: Config, selection: str,
                                 f"{kind}  ·  {cmd.model.provider} · {cmd.model.model}", cmd.icon))
         listbox.append(_row(TRANSLATE, t("Translate"), t("Translate text"),
                             "preferences-desktop-locale-symbolic"))
+        listbox.append(_row(REPLY, t("Reply"), t("Write a reply to the selected message"),
+                            "mail-reply-sender-symbolic"))
         listbox.append(_row(SETTINGS, t("Settings"), t("Commands, notifications, models"),
                             "preferences-system-symbolic"))
         scroller = Gtk.ScrolledWindow(child=listbox, vexpand=True,

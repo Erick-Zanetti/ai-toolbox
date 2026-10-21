@@ -11,7 +11,7 @@ import argparse
 import threading
 
 from . import config, desktop, dictation, prompts, providers
-from .cli import SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver, notify
+from .cli import REPLY, SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver, notify
 from .i18n import t
 from .ui.common import APP_ID, Adw, Gio, GLib, idle, install_css  # noqa: F401
 
@@ -73,6 +73,8 @@ class ToolboxApp(Adw.Application):
             else:
                 inv = capture(cfg)
             self.open_translate(cfg, inv, args.context)
+        elif args.action == REPLY:
+            self.open_reply(cfg, capture(cfg))
         else:
             self.open_palette(cfg, capture(cfg))
         return 0
@@ -136,6 +138,13 @@ class ToolboxApp(Adw.Application):
             self, cfg, inv.text, contextual,
             lambda outcome: deliver(outcome.action, outcome.text, inv, cfg)).present()
 
+    def open_reply(self, cfg: config.Config, inv: Invocation) -> None:
+        from .ui import reply
+
+        reply.open_window(
+            self, cfg, inv.text,
+            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg)).present()
+
     def open_palette(self, cfg: config.Config, inv: Invocation) -> None:
         from .ui import palette
 
@@ -162,6 +171,8 @@ class ToolboxApp(Adw.Application):
             self.open_translate(cfg, inv)
         elif choice == SETTINGS:
             self.open_settings()
+        elif choice == REPLY:
+            self.open_reply(cfg, inv)
         else:
             self.run_command(cfg.commands[choice], cfg, inv, force_window=False)
 
