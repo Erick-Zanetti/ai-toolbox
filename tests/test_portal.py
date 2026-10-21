@@ -21,6 +21,14 @@ def private_bus(tmp_path, monkeypatch):
                               stdout=subprocess.PIPE, text=True)
     address = daemon.stdout.readline().strip()
     monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", address)
+    # Gio caches the session bus once anything (e.g. GTK in an earlier test)
+    # opened it, ignoring the address above: connect to the private one directly.
+    from gi.repository import Gio
+
+    flags = (Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
+             | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION)
+    monkeypatch.setattr(Gio, "bus_get_sync", lambda _type, *_: Gio.DBusConnection.new_for_address_sync(
+        address, flags, None, None))
     log = tmp_path / "calls.jsonl"
     mock = subprocess.Popen([sys.executable, str(HERE / "portal_mock.py"), str(log)],
                             stdout=subprocess.PIPE, text=True, env={**os.environ})
