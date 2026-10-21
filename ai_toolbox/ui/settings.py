@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from .. import config
+from .. import config, models
 from ..i18n import t
 from ..store import Store
-from .common import Adw, GLib, Gtk, buffer_text, run_window
+from .choice import ChoiceRow, choice_row
+from .common import Adw, GLib, Gtk, buffer_text, idle, run_window
 
 SAVE_DEBOUNCE_MS = 600
 NOTIFICATION_LEVELS = ("all", "errors", "off")
@@ -55,6 +56,8 @@ class Settings:
         self.pending: set[str] = set()  # "config", "context", "cmd:<id>"
         self.timer = 0
         self.context_text = self.store.context()
+        self.catalog = models.Catalog(post=lambda fn: idle(fn)())
+        self.default_followers: list[Callable[[], None]] = []  # rows on the "Default" provider
 
         self.win = Adw.ApplicationWindow(application=app, title=f"AI Toolbox · {t('Settings')}",
                                          default_width=760, default_height=720)
@@ -115,6 +118,47 @@ class Settings:
     def _providers(self) -> list[str]:
         return list(self.data.get("providers", {}))
 
+    def _default_provider(self) -> str:
+        names = self._providers()
+        return self.data.get("default_provider", names[0] if names else "")
+
+    def _request_models(self, name: str | None, answer: Callable[[list[str]], None]) -> None:
+        """Models of provider `name` (None: the default provider), maybe later."""
+        name = name or self._default_provider()
+        self.catalog.request(name, self.data.get("providers", {}).get(name, {}), answer)
+
+    def _model_rows(self, table: dict, set_value: Callable[[str, object], None]) -> list[Gtk.Widget]:
+        """Provider and model dropdowns for a command or a translation mode. The
+        model list follows the provider picked beside it."""
+        names = [t("Default"), *self._providers()]
+        provider = table.get("provider")
+        model = ChoiceRow(t("Model"), table.get("model", ""), lambda v: set_value("model", v),
+                          empty_label=t("Provider default"))
+        asked: list[str | None] = [None]
+
+        def load(name: str | None, keep_unknown: bool = True) -> None:
+            asked[0] = name
+
+            def answer(known: list[str]) -> None:
+                if asked[0] == name:  # ignore a late answer for a provider no longer picked
+                    model.set_known(known, keep_unknown)
+
+            self._request_models(name, answer)
+
+        def pick(index: int) -> None:
+            name = None if index == 0 else names[index]
+            set_value("provider", name)
+            load(name, keep_unknown=False)
+
+        def follow_default() -> None:
+            if asked[0] is None:
+                load(None)
+
+        self.default_followers.append(follow_default)
+        load(provider if provider in names[1:] else None)
+        return [_combo(t("Provider"), names, names.index(provider) if provider in names else 0, pick),
+                model.row]
+
     def _general_page(self) -> Adw.PreferencesPage:
         page = Adw.PreferencesPage()
 
@@ -157,25 +201,17 @@ class Settings:
             description=t("claude and codex use your logged-in CLIs; openai is any "
                           "OpenAI-compatible server such as Ollama."))
         names = self._providers()
-        default = self.data.get("default_provider", names[0] if names else "")
+        default = self._default_provider()
+
+        def pick_default(index: int) -> None:
+            self._set(self.data, "default_provider", names[index])
+            for follow in self.default_followers:
+                follow()
+
         accounts.add(_combo(t("Default provider"), names,
-                            names.index(default) if default in names else 0,
-                            lambda i: self._set(self.data, "default_provider", names[i])))
+                            names.index(default) if default in names else 0, pick_default))
         for name, provider in self.data.get("providers", {}).items():
-            kind = provider.get("type", name)
-            row = Adw.ExpanderRow(title=name, subtitle=f"{t(PROVIDER_KINDS.get(kind, kind))}"
-                                  f"  ·  {provider.get('model', '')}")
-            row.add_row(_entry(t("Default model"), provider.get("model", ""),
-                               lambda v, p=provider: self._set(p, "model", v)))
-            if kind == "codex":
-                row.add_row(_entry(t("Reasoning effort"), provider.get("reasoning", ""),
-                                   lambda v, p=provider: self._set(p, "reasoning", v)))
-            if kind == "openai":
-                row.add_row(_entry(t("Server URL"), provider.get("base_url", ""),
-                                   lambda v, p=provider: self._set(p, "base_url", v)))
-                row.add_row(_entry(t("API key variable (optional)"), provider.get("api_key_env", ""),
-                                   lambda v, p=provider: self._set(p, "api_key_env", v)))
-            accounts.add(row)
+            accounts.add(self._provider_row(name, provider))
         if not any(p.get("type") == "openai" for p in self.data.get("providers", {}).values()):
             add = Adw.ButtonRow(title=t("Add local models (Ollama)"),
                                 start_icon_name="list-add-symbolic")
@@ -183,6 +219,37 @@ class Settings:
             accounts.add(add)
         page.add(accounts)
         return page
+
+    def _provider_row(self, name: str, provider: dict) -> Adw.ExpanderRow:
+        kind = provider.get("type", name)
+        row = Adw.ExpanderRow(title=name)
+        reasoning = None
+
+        def subtitle() -> None:
+            row.set_subtitle(f"{t(PROVIDER_KINDS.get(kind, kind))}  ·  {provider.get('model', '')}")
+
+        def pick_model(value: str) -> None:
+            self._set(provider, "model", value)
+            subtitle()
+            if reasoning is not None:
+                reasoning.set_known(models.codex_reasoning(value))
+
+        subtitle()
+        model = ChoiceRow(t("Default model"), provider.get("model", ""), pick_model)
+        self.catalog.request(name, provider, model.set_known)
+        row.add_row(model.row)
+        if kind == "codex":
+            reasoning = choice_row(t("Reasoning effort"), provider.get("reasoning", ""),
+                                   models.codex_reasoning(provider.get("model", "")),
+                                   lambda v: self._set(provider, "reasoning", v),
+                                   empty_label=t("Model default"))
+            row.add_row(reasoning.row)
+        if kind == "openai":
+            row.add_row(_entry(t("Server URL"), provider.get("base_url", ""),
+                               lambda v: self._set(provider, "base_url", v)))
+            row.add_row(_entry(t("API key variable (optional)"), provider.get("api_key_env", ""),
+                               lambda v: self._set(provider, "api_key_env", v)))
+        return row
 
     def _dictation_group(self) -> Adw.PreferencesGroup:
         spec = self.data.setdefault("dictation", {})
@@ -194,10 +261,11 @@ class Settings:
         group.add(_combo(t("Device"), [t("Automatic (GPU when available)"), "NVIDIA GPU", "CPU"],
                          devices.index(device) if device in devices else 0,
                          lambda i: self._set(spec, "device", devices[i])))
-        group.add(_entry(t("GPU model"), spec.get("model", "large-v3-turbo"),
-                         lambda v: self._set(spec, "model", v)))
-        group.add(_entry(t("CPU model"), spec.get("cpu_model", "small"),
-                         lambda v: self._set(spec, "cpu_model", v)))
+        sizes = models.known("dictation")
+        group.add(choice_row(t("GPU model"), spec.get("model", "large-v3-turbo"), sizes,
+                             lambda v: self._set(spec, "model", v)).row)
+        group.add(choice_row(t("CPU model"), spec.get("cpu_model", "small"), sizes,
+                             lambda v: self._set(spec, "cpu_model", v)).row)
         group.add(_entry(t("Language (empty = detect)"), spec.get("language", ""),
                          lambda v: self._set(spec, "language", v)))
         names = [t("Paste as spoken"), *self.commands]
@@ -238,13 +306,8 @@ class Settings:
             t("Result"), [t("Show a window"), t("Replace directly")],
             OUTPUT_MODES.index(output) if output in OUTPUT_MODES else 0,
             lambda i: update("output", OUTPUT_MODES[i])))
-        names = [t("Default"), *self._providers()]
-        provider = cmd.get("provider")
-        row.add_row(_combo(t("Provider"), names,
-                           names.index(provider) if provider in names else 0,
-                           lambda i: update("provider", None if i == 0 else names[i])))
-        row.add_row(_entry(t("Model (empty = provider default)"), cmd.get("model", ""),
-                           lambda v: update("model", v)))
+        for widget in self._model_rows(cmd, update):
+            row.add_row(widget)
         row.add_row(_entry(t("Icon name"), cmd.get("icon", ""), lambda v: update("icon", v)))
 
         prompt = Adw.PreferencesRow(activatable=False)
@@ -312,17 +375,12 @@ class Settings:
                                              [x.strip() for x in v.split(",") if x.strip()])))
         page.add(langs)
 
-        names = [t("Default"), *self._providers()]
         for key, title in (("literal", t("Literal translation")),
                            ("contextual", t("Translation with context"))):
             spec = tr.setdefault(key, {})
             group = Adw.PreferencesGroup(title=title)
-            provider = spec.get("provider")
-            group.add(_combo(t("Provider"), names,
-                             names.index(provider) if provider in names else 0,
-                             lambda i, s=spec: self._set(s, "provider", None if i == 0 else names[i])))
-            group.add(_entry(t("Model (empty = provider default)"), spec.get("model", ""),
-                             lambda v, s=spec: self._set(s, "model", v)))
+            for widget in self._model_rows(spec, lambda k, v, s=spec: self._set(s, k, v)):
+                group.add(widget)
             page.add(group)
         return page
 

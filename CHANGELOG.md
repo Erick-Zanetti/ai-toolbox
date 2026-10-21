@@ -29,6 +29,12 @@ All notable changes to this project. Dates are YYYY-MM-DD.
 - AUR-ready `ai-toolbox-git` package (PKGBUILD + .SRCINFO, builds clean).
 
 ### Changed
+- Settings: every model field is now a list to pick from (provider default
+  models, commands, translation, dictation), and so is Codex's reasoning
+  effort. The lists come from the Claude CLI aliases, the Codex CLI's model
+  cache, the OpenAI-compatible server's `/models` (fetched in the background,
+  Settings opens at once) and the Whisper sizes. A command's or translation's
+  model list follows its provider; "Provider default" leaves the model unset.
 - The daemon logs each action (name and command id, never your text) and any
   crash in a flow with its traceback; SIGUSR1 dumps all thread stacks.
 

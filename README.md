@@ -172,6 +172,12 @@ ai-toolbox daemon             stay running so windows open instantly
   contextual translation.
 - **Context**: `context.md`, who you are and how you write.
 
+Models are picked from lists: the Claude Code aliases (haiku, sonnet, opus),
+the models your Codex CLI lists (`~/.codex/models_cache.json`, with each
+model's reasoning efforts), whatever an OpenAI-compatible server reports at
+`/models` (asked in the background, 2 s at most) and the Whisper sizes for
+dictation. A model you typed by hand stays in the list.
+
 History is `[history]` in `config.toml` (`enabled = true`, `max_entries = 50`).
 Entries are kept in `~/.local/state/ai-toolbox/history.json`, readable only
 by you.
