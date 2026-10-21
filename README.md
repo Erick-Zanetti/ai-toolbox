@@ -18,6 +18,14 @@ Select text anywhere, press a shortcut, get it fixed, rewritten or translated.</
 - **Ask for changes.** A field under the result takes free instructions
   ("more formal", "as bullet points") and reworks the current result; Ctrl+R
   reruns the command on it, including your edits.
+- **Tone and alternatives.** Ctrl+T cycles the result through casual, formal,
+  friendly and direct, and back to the original; Alt+Down lists three other
+  ways to say it, Enter picks one.
+- **Reply.** Select a message you received (Slack, Teams, email), jot what you
+  want to say in any language, press Enter: the reply comes out as you, in the
+  language of the message. Empty notes give three short replies to pick from.
+- **History.** The last 50 results you replaced, pasted or copied, searchable
+  from the palette or `ai-toolbox history`. Stays on your machine; can be off.
 - **Dictation.** Press a shortcut, talk, press it again: local Whisper
   (large-v3-turbo on an NVIDIA GPU, ~0.4 s for a sentence; a small model on
   the CPU otherwise) types the text where you were. `--then fix-spelling`
@@ -111,6 +119,7 @@ Bind these in your compositor:
 |---|---|
 | Super+Alt+C | `ai-toolbox run fix-spelling` |
 | Super+Alt+T | `ai-toolbox translate` |
+| Super+Alt+R | `ai-toolbox reply` |
 | Super+Alt+Space | `ai-toolbox` (palette) |
 | Super+Alt+D | `ai-toolbox dictate` (again to stop) |
 | Super+Alt+Shift+D | `ai-toolbox dictate --then fix-spelling` |
@@ -135,7 +144,9 @@ ai-toolbox run <command>      run on the selection (output from the command file
 ai-toolbox window <command>   same, always showing the result window
 ai-toolbox translate          translator, prefilled with the selection
                               (--empty: start empty, --context: with context on)
+ai-toolbox reply              write a reply to the selected message
 ai-toolbox dictate            start/stop dictation (--then <command>, --cancel)
+ai-toolbox history            recent results, newest first (--json, --clear)
 ai-toolbox settings           settings window
 ai-toolbox list               list commands
 ai-toolbox daemon             stay running so windows open instantly
@@ -143,21 +154,27 @@ ai-toolbox daemon             stay running so windows open instantly
 
 | Window | Keys |
 |---|---|
-| Result | Ctrl+Enter replace · Ctrl+Shift+C copy · Ctrl+L ask for a change · Ctrl+R retry · Esc close |
+| Result | Ctrl+Enter replace · Ctrl+Shift+C copy · Ctrl+L ask for a change · Ctrl+R retry · Ctrl+T next tone · Alt+Down alternatives · Esc close |
+| Reply | Enter (in notes) write, or three suggestions when empty · Ctrl+T next tone · Alt+Down alternatives · Ctrl+Enter copy · Esc close |
+| History | type to search · Enter or double click copy · Esc close |
 | Translator | Ctrl+Enter paste into app · Ctrl+Shift+C copy · Ctrl+S swap · Ctrl+I with context · Ctrl+P / Ctrl+Shift+P target / source · Esc clear, then close |
 
 ## Configuration
 
 `ai-toolbox settings` (also in the palette) edits everything and saves as you go:
 
-- **General**: notifications (all, errors only, off), copy fallback, default
-  provider, models, local models (Ollama).
+- **General**: notifications (all, errors only, off), copy fallback, history,
+  default provider, models, local models (Ollama).
 - **Commands**: create, edit and delete commands. Per command, choose **Show a
   window** (review and edit, Ctrl+Enter to replace) or **Replace directly**
   (no window, progress in notifications).
 - **Translate**: language pair, extra languages, models for literal and
   contextual translation.
 - **Context**: `context.md`, who you are and how you write.
+
+History is `[history]` in `config.toml` (`enabled = true`, `max_entries = 50`).
+Entries are kept in `~/.local/state/ai-toolbox/history.json`, readable only
+by you.
 
 The files live in `~/.config/ai-toolbox/` (`config.toml`, `commands/*.toml`,
 `context.md`) and are fine to edit by hand; see [`examples`](examples).
@@ -194,6 +211,8 @@ uv run --no-project --with pytest python -m pytest     # core tests
 ```
 
 Adding a UI language: add a table to [`ai_toolbox/i18n.py`](ai_toolbox/i18n.py).
+The daemon logs one line per action to the journal (`journalctl --user -u ai-toolbox`);
+if it ever hangs, `systemctl --user kill -s USR1 ai-toolbox` dumps every thread's stack there.
 Screenshots: `scripts/screenshots.sh` (Hyprland) regenerates `docs/screenshots`.
 
 ## License

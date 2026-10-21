@@ -5,6 +5,15 @@ All notable changes to this project. Dates are YYYY-MM-DD.
 ## Unreleased
 
 ### Added
+- Reply (`ai-toolbox reply`, palette): writes your answer to the selected
+  message from short notes in any language, in the message's language and
+  your voice (`context.md`); empty notes suggest three replies. Copies, never
+  replaces.
+- Tone and alternatives in the result and reply windows: Ctrl+T cycles
+  neutral → casual → formal → friendly → direct; Alt+Down lists three other
+  versions to pick from.
+- History of delivered results (last 50, `[history]` in config.toml, toggle
+  in Settings): History in the palette, `ai-toolbox history [--json|--clear]`.
 - Dictation: local Whisper speech-to-text (GPU or CPU), a recording pill,
   `ai-toolbox dictate [--then <command>]`, settings for model and language.
 - Daemon mode: `ai-toolbox daemon` (and `ai-toolbox.service`) keeps one
@@ -18,6 +27,10 @@ All notable changes to this project. Dates are YYYY-MM-DD.
 - Pasting on GNOME and KDE through the RemoteDesktop portal (asks once).
 - CI: lint and tests on GitHub Actions.
 - AUR-ready `ai-toolbox-git` package (PKGBUILD + .SRCINFO, builds clean).
+
+### Changed
+- The daemon logs each action (name and command id, never your text) and any
+  crash in a flow with its traceback; SIGUSR1 dumps all thread stacks.
 
 ### Fixed
 - An app that owns the selection but never sends it no longer freezes the
