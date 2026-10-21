@@ -8,11 +8,14 @@ the primary alive between uses."""
 from __future__ import annotations
 
 import argparse
+import faulthandler
+import signal
 import threading
+import traceback
 
 from . import config, desktop, dictation, prompts, providers
 from .cli import (HISTORY, REPLY, SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver,
-                  notify)
+                  describe, log, notify)
 from .i18n import t
 from .ui.common import APP_ID, Adw, Gio, GLib, idle, install_css  # noqa: F401
 
@@ -43,16 +46,31 @@ class ToolboxApp(Adw.Application):
             desktop.notify(f"Config: {err}", urgency="critical")
             command_line.printerr_literal(f"ai-toolbox: {err}\n")
             return 2
+        except Exception as err:  # logged, never silent
+            self._failed(err)
+            return 1
 
     def _from_args(self, argv: list[str]) -> None:
         try:
             self._dispatch(build_parser().parse_args(argv))
         except (SystemExit, config.ConfigError) as err:
             desktop.notify(f"ai-toolbox: {err}", urgency="critical")
+        except Exception as err:  # logged, never silent
+            self._failed(err)
+
+    @staticmethod
+    def _failed(err: Exception) -> None:
+        """A flow crashed: traceback to the journal, a notification to the user."""
+        traceback.print_exc()
+        desktop.notify(f"ai-toolbox: {err}", urgency="critical")
 
     def _dispatch(self, args: argparse.Namespace) -> int:
+        log(describe(args))
         if args.action == "daemon":
             self.hold()  # stay alive with no windows
+            # A hang leaves no error: `systemctl --user kill -s USR1 ai-toolbox`
+            # dumps every thread's stack to the journal.
+            faulthandler.register(signal.SIGUSR1, all_threads=True)
             return 0
         if args.action == "settings":
             self.open_settings()
@@ -172,6 +190,8 @@ class ToolboxApp(Adw.Application):
             def next_window() -> bool:
                 try:
                     self._after_palette(choice, cfg, inv)
+                except Exception as err:  # logged, never silent
+                    self._failed(err)
                 finally:
                     self.release()
                 return False

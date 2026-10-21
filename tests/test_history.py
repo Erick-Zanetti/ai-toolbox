@@ -135,3 +135,10 @@ def test_parser_knows_reply_and_history():
     assert parser.parse_args(["reply"]).action == "reply"
     args = parser.parse_args(["history", "--json"])
     assert (args.action, args.json, args.clear) == ("history", True, False)
+
+
+def test_dispatch_log_line_never_has_the_text():
+    args = cli.build_parser().parse_args(["run", "fix-spelling"])
+    assert cli.describe(args) == "run fix-spelling"
+    assert cli.describe(cli.build_parser().parse_args(["reply"])) == "reply"
+    assert cli.describe(cli.build_parser().parse_args([])) == "palette"

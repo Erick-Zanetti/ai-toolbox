@@ -69,6 +69,13 @@ def log(message: str) -> None:
     print(f"ai-toolbox: {message}", file=sys.stderr, flush=True)
 
 
+def describe(args: argparse.Namespace) -> str:
+    """The action for the log: names and ids only, never the user's text."""
+    action = args.action or "palette"
+    detail = getattr(args, "command", None) or getattr(args, "then", None)
+    return f"{action} {detail}" if detail else action
+
+
 def remember(cfg: config.Config, source: str, name: str, text: str, output: str) -> None:
     if not cfg.history.enabled:
         return
