@@ -9,7 +9,7 @@ from collections.abc import Callable
 from .. import providers, prompts
 from ..config import Config
 from ..i18n import t
-from .common import (Adw, GLib, Gtk, buffer_text, hint_bar, idle, run_window, shortcut,
+from .common import (Adw, GLib, Gtk, buffer_text, hint_bar, idle, on_closed, run_window, shortcut,
                      text_view)
 from .result import Outcome
 
@@ -210,7 +210,7 @@ def open_window(app: Adw.Application, cfg: Config, text: str, contextual: bool,
         return win
 
     win = build(app)
-    win.connect("destroy", lambda *_: on_finish(outcome))
+    on_closed(win, lambda: on_finish(outcome))
     return win
 
 

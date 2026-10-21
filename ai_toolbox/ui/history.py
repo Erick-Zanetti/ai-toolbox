@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 from .. import history
 from ..i18n import t
-from .common import Adw, Gtk, hint_bar, run_window, shortcut
+from .common import Adw, Gtk, hint_bar, on_closed, run_window, shortcut
 
 KEYS = [("↑↓", "navigate"), ("Enter", "copy"), ("Esc", "close")]
 
@@ -119,7 +119,7 @@ def open_window(app: Adw.Application, on_finish: Callable[[history.Entry | None]
         return win
 
     win = build(app)
-    win.connect("destroy", lambda *_: on_finish(chosen["entry"]))
+    on_closed(win, lambda: on_finish(chosen["entry"]))
     return win
 
 

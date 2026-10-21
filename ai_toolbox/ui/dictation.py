@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..i18n import t
-from .common import Adw, GLib, Gtk, hint_bar, shortcut
+from .common import Adw, GLib, Gtk, hint_bar, on_closed, shortcut
 
 TITLE = "AI Toolbox · Dictation"
 STATES = {
@@ -39,7 +39,7 @@ class Pill:
         shortcut(self.win, "Return", on_stop)
         shortcut(self.win, "KP_Enter", on_stop)
         shortcut(self.win, "Escape", on_cancel)
-        self.win.connect("destroy", lambda *_: self._stop_timer())
+        on_closed(self.win, self._stop_timer)
         self.set_state("recording")
 
     def _tick(self) -> bool:

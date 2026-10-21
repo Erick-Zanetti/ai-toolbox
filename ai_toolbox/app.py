@@ -181,6 +181,7 @@ class ToolboxApp(Adw.Application):
         from .ui import palette
 
         def chosen(choice: str | None) -> None:
+            log(f"palette → {choice or 'closed'}")
             if choice is None:
                 return
             # Open the next window after the palette is gone, so focus is sane;
@@ -301,6 +302,7 @@ class ToolboxApp(Adw.Application):
     def open_settings(self) -> None:
         for window in self.get_windows():
             if getattr(window, "is_settings", False):
+                log(f"settings: present the open window (visible={window.get_visible()})")
                 window.present()
                 return
         from .ui import settings
@@ -308,6 +310,7 @@ class ToolboxApp(Adw.Application):
         window = settings.open_window(self)
         window.is_settings = True
         window.present()
+        log("settings: new window")
 
 
 def run(argv: list[str]) -> int:

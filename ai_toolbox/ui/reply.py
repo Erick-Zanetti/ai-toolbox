@@ -11,7 +11,8 @@ from collections.abc import Callable
 from .. import prompts, providers
 from ..config import Config
 from ..i18n import t
-from .common import Adw, Gtk, buffer_text, hint_bar, idle, pane, run_window, shortcut, text_view
+from .common import (Adw, Gtk, buffer_text, hint_bar, idle, on_closed, pane, run_window, shortcut,
+                     text_view)
 from .result import Outcome
 from .variants import Alternatives, Tone
 
@@ -187,7 +188,7 @@ def open_window(app: Adw.Application, cfg: Config, received: str,
         return win
 
     win = build(app)
-    win.connect("destroy", lambda *_: on_finish(outcome))
+    on_closed(win, lambda: on_finish(outcome))
     return win
 
 

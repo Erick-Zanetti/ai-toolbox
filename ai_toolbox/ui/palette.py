@@ -7,7 +7,7 @@ from collections.abc import Callable
 from ..cli import HISTORY, REPLY, SETTINGS, TRANSLATE
 from ..config import Config
 from ..i18n import t
-from .common import Adw, Gtk, hint_bar, icon_tile, run_window, shortcut
+from .common import Adw, Gtk, hint_bar, icon_tile, on_closed, run_window, shortcut
 
 PREVIEW_CHARS = 180
 KEYS = [("↑↓", "navigate"), ("Enter", "run"), ("Esc", "close")]
@@ -118,7 +118,7 @@ def open_window(app: Adw.Application, cfg: Config, selection: str,
         return win
 
     win = build(app)
-    win.connect("destroy", lambda *_: on_finish(chosen["id"]))
+    on_closed(win, lambda: on_finish(chosen["id"]))
     return win
 
 

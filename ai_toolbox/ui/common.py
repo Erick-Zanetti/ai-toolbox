@@ -174,3 +174,19 @@ def run_window(build) -> int:
 def idle(fn):
     """Wrap a worker-thread callback so it runs on the GTK main loop."""
     return lambda *args: GLib.idle_add(lambda: (fn(*args), False)[1])
+
+
+def on_closed(win: Gtk.Window, callback) -> None:
+    """Run `callback` once, as soon as the window closes. "destroy" alone is not
+    enough: the windows' own closures keep them alive, so it only fires when
+    Python's garbage collector gets to them, minutes later or never."""
+    done = [False]
+
+    def fire(*_) -> bool:
+        if not done[0]:
+            done[0] = True
+            callback()
+        return False  # let the window close
+
+    win.connect("close-request", fire)
+    win.connect("destroy", fire)

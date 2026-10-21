@@ -13,8 +13,8 @@ from .. import prompts, providers
 from ..config import Model
 from ..editing import next_input
 from ..i18n import t
-from .common import (Adw, GLib, Gtk, buffer_text, clear_diff, hint_bar, idle, pane, run_window,
-                     shortcut, show_diff, stat_pill, text_view)
+from .common import (Adw, GLib, Gtk, buffer_text, clear_diff, hint_bar, idle, on_closed, pane,
+                     run_window, shortcut, show_diff, stat_pill, text_view)
 from .variants import Alternatives, Tone
 
 DIFF_DEBOUNCE_MS = 250
@@ -235,7 +235,7 @@ def open_window(app: Adw.Application, title: str, model: Model, system: str,
         return win
 
     win = build(app)
-    win.connect("destroy", lambda *_: on_finish(outcome))
+    on_closed(win, lambda: on_finish(outcome))
     return win
 
 

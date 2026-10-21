@@ -33,6 +33,9 @@ All notable changes to this project. Dates are YYYY-MM-DD.
   crash in a flow with its traceback; SIGUSR1 dumps all thread stacks.
 
 ### Fixed
+- Choosing something in the palette (Settings, History, a command) sometimes
+  did nothing: windows reported their outcome only when Python's garbage
+  collector destroyed them. They now report it the moment they close.
 - An app that owns the selection but never sends it no longer freezes the
   daemon: reading the selection and the clipboard gives up after 2 s.
 
