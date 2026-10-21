@@ -174,6 +174,7 @@ def open_window(app: Adw.Application, cfg: Config, text: str, contextual: bool,
                 state["run"].cancel()
             outcome.action = action
             outcome.text = buffer_text(out_view).strip()
+            outcome.input = buffer_text(src_view).strip()
             win.close()
 
         def escape() -> None:

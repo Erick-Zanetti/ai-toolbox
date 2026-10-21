@@ -129,6 +129,17 @@ _PT = {
     "Paste the message you received first.": "Cole primeiro a mensagem que você recebeu.",
     "write": "escrever",
     "copy": "copiar",
+    "History": "Histórico",
+    "Recent results, copy one again": "Resultados recentes, copie de novo",
+    "Search history": "Buscar no histórico",
+    "Clear history": "Limpar histórico",
+    "Clear history?": "Limpar o histórico?",
+    "Every saved result is deleted. This cannot be undone.": "Todos os resultados salvos são apagados. Não dá para desfazer.",
+    "Cancel": "Cancelar",
+    "Clear": "Limpar",
+    "Nothing here yet: results you replace, paste or copy show up here.": "Nada aqui ainda: os resultados que você substitui, cola ou copia aparecem aqui.",
+    "Keep a history": "Manter histórico",
+    "Recent results, under History in the palette. Stays on this computer.": "Resultados recentes, em Histórico na paleta. Fica só neste computador.",
 }
 
 _TABLES = {"pt": _PT}

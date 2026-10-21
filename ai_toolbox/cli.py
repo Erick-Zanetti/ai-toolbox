@@ -7,6 +7,7 @@
   ai-toolbox reply               write a reply to the selected message
   ai-toolbox settings            settings window
   ai-toolbox dictate             start/stop dictation (--then <command>, --cancel)
+  ai-toolbox history             recent results (--json, --clear)
   ai-toolbox list                list commands
   ai-toolbox daemon              stay running so windows open instantly
 """
@@ -14,12 +15,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
-from . import config, desktop
+from . import config, desktop, history
 from .i18n import t
 
 APP_ID = "dev.aitoolbox.AiToolbox"
@@ -27,6 +29,7 @@ OBJECT_PATH = "/" + APP_ID.replace(".", "/")
 TRANSLATE = "translate"
 SETTINGS = "settings"
 REPLY = "reply"
+HISTORY = "history"
 
 
 @dataclass(frozen=True)
@@ -61,9 +64,28 @@ def capture(cfg: config.Config) -> Invocation:
     return Invocation(text=text, target=target, desk=desk)
 
 
-def deliver(action: str | None, text: str, inv: Invocation, cfg: config.Config) -> None:
+def log(message: str) -> None:
+    """One line on stderr: the journal when running as the daemon."""
+    print(f"ai-toolbox: {message}", file=sys.stderr, flush=True)
+
+
+def remember(cfg: config.Config, source: str, name: str, text: str, output: str) -> None:
+    if not cfg.history.enabled:
+        return
+    try:
+        history.add(history.entry(source, name, text, output), cfg.history.max_entries)
+    except OSError as err:  # never lose the result over the history file
+        log(f"history not saved: {err}")
+
+
+def deliver(action: str | None, text: str, inv: Invocation, cfg: config.Config, *,
+            source: str, name: str, original: str | None = None) -> None:
+    """Copy or paste a result, and keep it in the history. `source` is the
+    command id, "translate", "reply" or "dictate"; `original` defaults to the
+    captured selection."""
     if not action or not text:
         return
+    remember(cfg, source, name, inv.text if original is None else original, text)
     desktop.copy(text)
     if action == "copy":
         notify(cfg, "info", t("Copied."), timeout_ms=1500)
@@ -86,6 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dictate")
     p.add_argument("--then", metavar="COMMAND", help="run a command on the transcript before pasting")
     p.add_argument("--cancel", action="store_true", help="stop without pasting")
+    p = sub.add_parser("history")
+    p.add_argument("--json", action="store_true", help="print the entries as JSON")
+    p.add_argument("--clear", action="store_true", help="delete every entry")
     for action in ("list", "palette", "reply", "settings", "daemon"):
         sub.add_parser(action)
     return parser
@@ -99,6 +124,19 @@ def list_commands() -> int:
         return 2
     for cmd in cfg.commands.values():
         print(f"{cmd.id:<20} {cmd.output:<8} {cmd.model.provider}/{cmd.model.model:<14} {cmd.name}")
+    return 0
+
+
+def show_history(args: argparse.Namespace) -> int:
+    if args.clear:
+        history.clear()
+        return 0
+    entries = history.load()
+    if args.json:
+        print(json.dumps([asdict(e) for e in entries], ensure_ascii=False, indent=1))
+        return 0
+    for item in entries:
+        print(history.summary(item))
     return 0
 
 
@@ -137,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)  # validate (and --help) locally
     if args.action == "list":
         return list_commands()
+    if args.action == HISTORY:
+        return show_history(args)
     if args.action != "daemon" and forward(argv):
         return 0
 

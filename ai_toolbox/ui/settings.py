@@ -133,6 +133,13 @@ class Settings:
         fallback.connect("notify::active",
                          lambda r, _p: self._set(self.data, "copy_fallback", r.get_active()))
         behavior.add(fallback)
+        kept = self.data.setdefault("history", {})
+        keep = Adw.SwitchRow(title=t("Keep a history"),
+                             subtitle=t("Recent results, under History in the palette. "
+                                        "Stays on this computer."),
+                             active=bool(kept.get("enabled", True)))
+        keep.connect("notify::active", lambda r, _p: self._set(kept, "enabled", r.get_active()))
+        behavior.add(keep)
         page.add(behavior)
 
         words = Adw.PreferencesGroup(

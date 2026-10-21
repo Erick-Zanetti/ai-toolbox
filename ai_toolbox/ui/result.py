@@ -26,6 +26,7 @@ KEYS = [("Ctrl+L", "ask"), ("Ctrl+R", "retry"), ("Ctrl+T", "tone"), ("Alt+↓", 
 class Outcome:
     action: str | None = None  # "replace" | "copy" | None (closed)
     text: str = ""
+    input: str | None = None  # what it was made from, for the history (None: the selection)
 
 
 def open_window(app: Adw.Application, title: str, model: Model, system: str,

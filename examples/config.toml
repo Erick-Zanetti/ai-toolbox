@@ -43,6 +43,13 @@ language = ""              # "" = detect, or "pt", "en"...
 then = ""                  # e.g. "fix-spelling": run a command on the transcript first
 idle_unload_minutes = 10
 
+[history]
+# The last results you replaced, pasted or copied: History in the palette,
+# `ai-toolbox history` in a terminal. Kept in ~/.local/state/ai-toolbox/history.json
+# (only you can read it) and never sent anywhere.
+enabled = true
+max_entries = 50
+
 [translate]
 # "Auto" target: text in one of these goes to the other.
 pair = ["English", "Portuguese (Brazil)"]

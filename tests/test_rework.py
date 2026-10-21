@@ -1,8 +1,8 @@
-"""Reply, tone and alternatives prompts."""
+"""Reply, tone and alternatives prompts; the [history] config table."""
 
 import pytest
 
-from ai_toolbox import prompts
+from ai_toolbox import config, prompts
 
 
 def test_tones_cycle_and_wrap_back_to_neutral():
@@ -64,6 +64,31 @@ def test_reply_prompts_carry_the_message_and_the_notes():
     suggestions = prompts.reply_suggestions_prompt("Lunch?")
     assert "<received_message>\nLunch?\n</received_message>" in suggestions
     assert "three" in suggestions and "one per line" in suggestions.lower()
+
+
+def _config(tmp_path, extra: str = "") -> config.Config:
+    (tmp_path / "config.toml").write_text(f'{extra}\n[providers.claude]\nmodel = "haiku"\n')
+    return config.load(tmp_path)
+
+
+def test_history_is_on_with_50_entries_by_default(tmp_path):
+    assert _config(tmp_path).history == config.History(enabled=True, max_entries=50)
+
+
+def test_history_settings_load(tmp_path):
+    cfg = _config(tmp_path, "[history]\nenabled = false\nmax_entries = 10")
+    assert cfg.history == config.History(enabled=False, max_entries=10)
+
+
+@pytest.mark.parametrize("table", [
+    "[history]\nmax_entries = 0",
+    "[history]\nmax_entries = true",
+    "[history]\nenabled = \"yes\"",
+    "[history]\nlimit = 5",
+])
+def test_bad_history_settings_are_rejected(tmp_path, table):
+    with pytest.raises(config.ConfigError):
+        _config(tmp_path, table)
 
 
 def test_every_ui_string_has_a_portuguese_translation():

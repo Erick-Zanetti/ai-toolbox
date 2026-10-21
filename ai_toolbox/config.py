@@ -19,6 +19,7 @@ EXAMPLES_DIRS = (
 OUTPUTS = ("replace", "window")
 KINDS = ("claude", "codex", "openai")
 NOTIFICATIONS = ("all", "errors", "off")
+MAX_HISTORY = 1000
 
 
 class ConfigError(Exception):
@@ -71,6 +72,12 @@ class Dictation:
 
 
 @dataclass(frozen=True)
+class History:
+    enabled: bool = True  # keep the last delivered results
+    max_entries: int = 50
+
+
+@dataclass(frozen=True)
 class Config:
     default: Model
     translate: Translate
@@ -80,6 +87,7 @@ class Config:
     notifications: str = "all"  # all | errors | off
     glossary: tuple[str, ...] = ()  # terms the AI must never change
     dictation: Dictation = Dictation()
+    history: History = History()
     commands: dict[str, Command] = field(default_factory=dict)
 
 
@@ -154,6 +162,19 @@ def _dictation(raw: dict) -> Dictation:
     return settings
 
 
+def _history(raw: dict) -> History:
+    unknown = set(raw) - set(History.__dataclass_fields__)
+    if unknown:
+        raise ConfigError(f"[history]: unknown keys {sorted(unknown)}")
+    settings = History(**raw)
+    if not isinstance(settings.enabled, bool):
+        raise ConfigError("history.enabled must be true or false")
+    if (isinstance(settings.max_entries, bool) or not isinstance(settings.max_entries, int)
+            or not 1 <= settings.max_entries <= MAX_HISTORY):
+        raise ConfigError(f"history.max_entries must be a number from 1 to {MAX_HISTORY}")
+    return settings
+
+
 def load(config_dir: Path = CONFIG_DIR) -> Config:
     if config_dir == CONFIG_DIR:
         ensure_user_config(config_dir)
@@ -199,5 +220,6 @@ def load(config_dir: Path = CONFIG_DIR) -> Config:
         notifications=notifications,
         glossary=tuple(str(term) for term in raw.get("glossary", ()) if str(term).strip()),
         dictation=_dictation(raw.get("dictation", {})),
+        history=_history(raw.get("history", {})),
         commands=commands,
     )

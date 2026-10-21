@@ -11,7 +11,8 @@ import argparse
 import threading
 
 from . import config, desktop, dictation, prompts, providers
-from .cli import REPLY, SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver, notify
+from .cli import (HISTORY, REPLY, SETTINGS, TRANSLATE, Invocation, build_parser, capture, deliver,
+                  notify)
 from .i18n import t
 from .ui.common import APP_ID, Adw, Gio, GLib, idle, install_css  # noqa: F401
 
@@ -96,7 +97,8 @@ class ToolboxApp(Adw.Application):
         window = result.open_window(
             self, cmd.name, cmd.model, system,
             lambda text: prompts.render(cmd.prompt, text, cfg.context), inv.text, cmd.diff,
-            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg))
+            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg,
+                                    source=cmd.id, name=cmd.name))
         window.present()
 
     def _replace_in_place(self, cmd: config.Command, cfg: config.Config, inv: Invocation,
@@ -118,7 +120,7 @@ class ToolboxApp(Adw.Application):
                 else:
                     notify(cfg, "info", t("{name}: done.", name=cmd.name),
                            replaces=note, timeout_ms=1500)
-                    deliver("replace", result, inv, cfg)
+                    deliver("replace", result, inv, cfg, source=cmd.id, name=cmd.name)
             finally:
                 self.release()
 
@@ -136,14 +138,26 @@ class ToolboxApp(Adw.Application):
 
         translate.open_window(
             self, cfg, inv.text, contextual,
-            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg)).present()
+            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg, source=TRANSLATE,
+                                    name=t("Translate"), original=outcome.input)).present()
 
     def open_reply(self, cfg: config.Config, inv: Invocation) -> None:
         from .ui import reply
 
         reply.open_window(
             self, cfg, inv.text,
-            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg)).present()
+            lambda outcome: deliver(outcome.action, outcome.text, inv, cfg, source=REPLY,
+                                    name=t("Reply"), original=outcome.input)).present()
+
+    def open_history(self, cfg: config.Config) -> None:
+        from .ui import history as history_window
+
+        def chosen(item) -> None:
+            if item is not None:
+                desktop.copy(item.output)
+                notify(cfg, "info", t("Copied."), timeout_ms=1500)
+
+        history_window.open_window(self, chosen).present()
 
     def open_palette(self, cfg: config.Config, inv: Invocation) -> None:
         from .ui import palette
@@ -173,6 +187,8 @@ class ToolboxApp(Adw.Application):
             self.open_settings()
         elif choice == REPLY:
             self.open_reply(cfg, inv)
+        elif choice == HISTORY:
+            self.open_history(cfg)
         else:
             self.run_command(cfg.commands[choice], cfg, inv, force_window=False)
 
@@ -235,9 +251,9 @@ class ToolboxApp(Adw.Application):
         command = cfg.commands.get(session["then"]) if session["then"] else None
 
         def work() -> None:
-            text, error = "", None
+            text, spoken, error = "", "", None
             try:
-                text = engine.transcribe(wav)
+                text = spoken = engine.transcribe(wav)
                 if text and command:
                     idle(lambda: pill.set_state("thinking", name=command.name))()
                     text = providers.complete(
@@ -247,16 +263,18 @@ class ToolboxApp(Adw.Application):
                 error = str(err)
             finally:
                 wav.unlink(missing_ok=True)
-            idle(done)(text, error)
+            idle(done)(text, spoken, error)
 
-        def done(text: str, error: str | None) -> None:
+        def done(text: str, spoken: str, error: str | None) -> None:
             self._end_dictation()
             if error:
                 notify(cfg, "error", t("Dictation failed: {err}", err=error))
             elif not text.strip():
                 notify(cfg, "warn", t("Nothing heard."))
             else:
-                deliver("replace", text.strip(), session["inv"], cfg)
+                deliver("replace", text.strip(), session["inv"], cfg, source="dictate",
+                        name=command.name if command else t("Dictation"),
+                        original=spoken.strip() if command else "")
 
         threading.Thread(target=work, daemon=True).start()
 
