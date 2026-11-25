@@ -94,6 +94,9 @@ Arch (AUR-style package in [`packaging/arch`](packaging/arch/PKGBUILD)):
 cd packaging/arch && makepkg -si
 ```
 
+Not on the AUR yet: new AUR account registrations are paused, so it is built locally for now
+(see [#1](https://github.com/Erick-Zanetti/ai-toolbox/issues/1)).
+
 From a checkout:
 
 ```sh
